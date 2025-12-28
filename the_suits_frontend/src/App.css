@@ -1,0 +1,207 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background-color: #f8f6ba;
+}
+
+.container {
+  padding: 20px;
+}
+
+
+h2 {
+  color: #333;
+  margin-left: 5px;
+  font-size: 30px;
+  margin-top: -2px;
+
+
+}
+
+.app-header .logo {
+  width: 180px;
+  margin-bottom: 20px;
+}
+
+.card {
+  margin: 20px 0;
+  padding: 20px;
+  /* border: 1px solid #ccc; */
+  border-radius: 8px;
+  display: grid;
+  box-shadow: 0 8px 12px rgb(92, 92, 92);
+  margin-left: 40px;
+  background-color: #fff;
+}
+
+
+
+ .stock-card {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  margin-left: 80px;
+
+}
+
+.stock-card .title {
+  width: 150px; /* حجم المربع */
+  padding: 10px;
+  border-radius: 8px;
+  color: rgb(0, 0, 0);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.5s ease-in-out;
+  transform: translateY(0);
+  box-shadow: 4px 8px 16px rgba(0, 0, 0, 0.952);
+}
+
+.stock-card .title h3 {
+  margin: 5px 0;
+  font-size: 17px;
+  text-align: center;
+}
+
+.stock-card .title p {
+  margin: 0;
+  font-size: 16px;
+}
+
+.stock-card .title button {
+  /* border: none; */
+  padding: 5px 10px;
+  cursor: pointer;
+  margin-top: 5px;
+  border-radius: 5px;
+}
+
+.stock-card .title.low-stock {
+  background-color: #cc0000ff;
+  /* box-shadow: 0 6px 12px rgb(255, 255, 255); */
+}
+
+.stock-card .title.high-stock {
+  background-color: #00e000ff;
+  /* box-shadow: 0 6px 12px rgb(255, 255, 255); */
+
+}
+
+.stock-card .title.low-stock button {
+  background-color: #00e000ff;
+  color: #000;
+}
+
+.stock-card .title.high-stock button {
+  background-color: #cc0000ff;
+  color: #000;
+  outline: none;
+}
+
+.stock-card .title:hover {
+  transform: translateY(-8px); 
+  /* transition: all 1s ease-in-out; */
+  box-shadow: 0 6px 12px rgb(0, 0, 0);
+  cursor: pointer;
+}
+
+
+
+/* ===== Buttons ===== */
+
+button,
+button:focus,
+button:focus-visible,
+button:active{
+  outline: none !important;
+  box-shadow:none !important;
+  border: none;
+}
+
+
+input,
+input:focus,
+input:focus-visible,
+input:active{
+  outline: none !important;
+  box-shadow:none !important;
+  border: none;
+}
+
+.btn {
+  outline: none;
+  box-shadow: none;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.25s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 5px;
+}
+
+/* نفس لون زر Refresh */
+.btn-primary {
+  background-color: #552f0f;
+  color: #fff;
+  outline: none;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(85, 47, 15, 0.35);
+}
+
+/* زر الحذف */
+.btn-danger {
+  background-color: #b30000;
+  color: #fff;
+}
+
+.btn-danger:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(179, 0, 0, 0.35);
+}
+
+/* Refresh مكانه مرتب */
+.refresh-btn {
+  margin: 60px 0 20px 40px;
+}
+
+/* ===== Cards ===== */
+.card {
+  background: #f8f8f8;
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+/* ===== Inputs ===== */
+.input {
+  
+  width: 95%;
+  padding: 10px;
+  border-radius: 8px;
+  /* border: 1px solid #ccc; */
+  margin: 6px 0;
+  outline: none;
+}
+
+.input:focus {
+  border-color: #552f0f;
+  box-shadow: 0 0 0 2px rgba(85, 47, 15, 0.2);
+}
+
+select{
+  outline: none !important;
+  box-shadow:none !important;
+  border: none;
+
+}
+

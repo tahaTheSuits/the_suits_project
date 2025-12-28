@@ -1,0 +1,216 @@
+/* ===== Container ===== */
+.reports-container {
+  padding: 20px;
+  font-family: Arial, sans-serif;
+  color: #333;
+}
+
+/* ===== Messages ===== */
+.message {
+  color: red;
+  font-size: 18px;
+  margin-bottom: 20px;
+}
+
+/* ===== Date Filters ===== */
+.reports-container label {
+  font-weight: bold;
+  font-size: 25px;
+}
+
+.reports-container input[type="date"] {
+  padding: 5px;
+  border-radius: 5px;
+  /* border: 1px solid #ccc; */
+  outline: none;
+  padding: 4px 8px;
+  margin-right: 20px;
+}
+
+.reports-container input[type="date"]:focus {
+  border-color: #75441c;
+  box-shadow: 0 0 5px #75441c66;
+  padding: 4px 8px;
+}
+
+
+.reports-title{
+    margin-left: 300px;
+    text-align: center;
+    justify-content: center;
+    margin-top: 250px;
+}
+
+
+.reports-filters{
+    text-align: center;
+    justify-items: center;
+    margin-left: 300px;
+    margin-top: 150px;
+}
+
+/* ===== Export Buttons ===== */
+.reports-container button {
+  padding: 8px 15px;
+  border: none;
+  border-radius: 5px;
+  background-color: #75441c;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.reports-container button:hover {
+  background-color: #a65b2c;
+  transform: translateY(-4px);
+}
+
+/* ===== Tables ===== */
+.reports-container table {
+  width: 90%;
+  margin: 20px auto;
+  border-collapse: collapse;
+  font-size: 16px;
+  margin-left: 220px;
+}
+
+
+/* Table Headers */
+.reports-container th {
+  background-color: #75441c;
+  color: white;
+  padding: 10px;
+  text-align: left;
+  transition: background-color 0.3s ease;
+}
+
+.reports-container th:hover {
+  background-color: #a65b2c;
+}
+
+/* Table Cells */
+.reports-container td {
+  padding: 8px;
+  border-bottom: 1px solid #ddd;
+}
+
+/* Zebra Striping */
+.reports-container tbody tr:nth-child(even) {
+  background-color: #f9f9f9;
+}
+
+/* Hover Effect */
+.reports-container tbody tr:hover {
+  background-color: #ffe6cc;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+/* ===== Section Headings ===== */
+.reports-container h2 {
+  font-size: 24px;
+  color: #333;
+  margin-top: 50px;
+  margin-left: 50px;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .reports-container {
+    padding: 10px;
+  }
+
+  .reports-container table {
+    width: 100%;
+    font-size: 14px;
+  }
+
+  .reports-container h1,
+  .reports-container h2 {
+    margin-left: 10px;
+  }
+
+  .reports-container div[style*="margin-left"] {
+    margin-left: 10px !important;
+  }}
+
+
+
+
+
+
+
+
+
+.export-wrapper {
+  position: relative;
+  display: inline-block;
+  
+}
+
+.export-btn {
+  padding: 10px 18px;
+  background-color: #1e88e5;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s ease;
+  margin-left: 550px;
+  margin-top: 30px;
+}
+
+.export-btn:hover {
+  background-color: #1565c0;
+}
+
+.export-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  right: 10;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+  padding: 12px;
+  min-width: 150px;
+  z-index: 100;
+  margin-left: 550px;
+  
+}
+
+.export-wrapper:hover .export-menu {
+  display: block;
+  
+}
+
+.export-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 10px;
+
+}
+
+.export-section span {
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.export-section button {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 5px;
+  background-color: #000000;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  text-align: left;
+  
+}
+
+.export-section button:hover {
+  background-color: #da0000;
+}
