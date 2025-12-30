@@ -10,7 +10,7 @@ const StockIn = require("../models/stockInModel");
 
 exports.createProduct = async (req, res) => {
   try {
-    const { name, minStock, initialQty } = req.body;
+    const { name, minStock, initialQty, unit } = req.body;
 
     const existingProduct = await Product.findOne({
       name: name.trim()
@@ -25,6 +25,7 @@ exports.createProduct = async (req, res) => {
     const product = await Product.create({
       name: name.trim(),
       minStock: Number(minStock) || 5,
+      unit,
     });
 
     if (initialQty && Number(initialQty) > 0) {
@@ -32,6 +33,8 @@ exports.createProduct = async (req, res) => {
         product: product._id,
         quantity: Number(initialQty),
         source: "Initial Stock",
+        unit,
+        
       });
     }
 

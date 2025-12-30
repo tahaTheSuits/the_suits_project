@@ -25,6 +25,11 @@ const stockOutSchema = new mongoose.Schema(
       type: Date,
       default: Date.now
     },
+        unit: {
+      type: String,
+      enum: ["pcs", "carton", "bag"],
+      default: "pcs"
+    },
     note: String
   },
   { timestamps: true }

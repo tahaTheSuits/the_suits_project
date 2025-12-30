@@ -32,7 +32,8 @@ exports.getDailyReport = async (req, res) => {
           _id: "$product",
           productName: { $first: "$productInfo.name" },
           totalUsed: { $sum: "$quantity" },
-          users: { $addToSet: "$usedBy" }
+          users: { $addToSet: "$usedBy" },
+          unit: r.product.unit,
         }
       }
     ]);
@@ -40,6 +41,6 @@ exports.getDailyReport = async (req, res) => {
     res.json(report);
 
   } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
+    res.status(500).json({ message: error.message });
+  }
 };

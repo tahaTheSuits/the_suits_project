@@ -4,7 +4,7 @@ const StockOut = require("../models/stockOutModel");
 // Stock Out
 exports.createStockOut = async (req, res) => {
   try {
-    const { product, quantity, usedBy, floor } = req.body;
+    const { product, quantity, usedBy, floor, unit } = req.body;
 
     if (!product || !quantity || !usedBy) {
       return res.status(400).json({ message: "Product, quantity and usedBy are required" });
@@ -17,6 +17,7 @@ exports.createStockOut = async (req, res) => {
       usedBy,
       floor: floor || "N/A", // لو المستخدم ما كتب طابق، نضع "N/A"
       date: new Date(), // التاريخ الحالي تلقائي
+      unit: unit || "pcs",
     });
 
     await stockOut.save();

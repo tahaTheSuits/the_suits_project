@@ -25,7 +25,7 @@ exports.getInventory = async (req, res) => {
         _id: product._id,
         product: product.name,
         quantity: totalIn - totalOut,
-        unit: "pcs",
+        unit: product.unit,
         minStock: product.minStock
       });
     }

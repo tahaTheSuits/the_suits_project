@@ -132,6 +132,7 @@ export default function Reports() {
             <th>Date</th>
             <th>Product</th>
             <th>Quantity</th>
+            <th>Unit</th>
             <th>Floor</th>
             <th>Used By</th>
           </tr>
@@ -142,6 +143,7 @@ export default function Reports() {
               <td>{formatDate(item.date)}</td>
               <td>{item.productName}</td>
               <td>{item.quantity}</td>
+              <td>{item.unit}</td>
               <td>{item.floor || "-"}</td>
               <td>{item.usedBy || "-"}</td>
             </tr>
@@ -161,6 +163,7 @@ export default function Reports() {
             <th>Date</th>
             <th>Product</th>
             <th>Quantity</th>
+            <th>Unit</th>
             <th>Floor</th>
             <th>Used By</th>
           </tr>
@@ -171,6 +174,7 @@ export default function Reports() {
               <td>{formatDate(item.date)}</td>
               <td>{item.productName}</td>
               <td>{item.quantity}</td>
+              <td>{item.unit}</td>
               <td>{item.floor || "-"}</td>
               <td>{item.usedBy || "-"}</td>
             </tr>
@@ -190,6 +194,7 @@ export default function Reports() {
             <th>Date</th>
             <th>Product</th>
             <th>Quantity</th>
+            <th>Unit</th>
             <th>Source</th>
           </tr>
         </thead>
@@ -199,6 +204,7 @@ export default function Reports() {
               <td>{formatDate(item.date)}</td>
               <td>{item.productName}</td>
               <td>{item.quantity}</td>
+              <td>{item.unit}</td>
               <td>{item.source || "-"}</td>
             </tr>
           ))}
@@ -217,6 +223,7 @@ export default function Reports() {
             <th>Date</th>
             <th>Product</th>
             <th>Quantity</th>
+            <th>Unit</th>
             <th>Source</th>
           </tr>
         </thead>
@@ -226,6 +233,7 @@ export default function Reports() {
               <td>{formatDate(item.date)}</td>
               <td>{item.productName}</td>
               <td>{item.quantity}</td>
+              <td>{item.unit}</td>
               <td>{item.source || "-"}</td>
             </tr>
           ))}

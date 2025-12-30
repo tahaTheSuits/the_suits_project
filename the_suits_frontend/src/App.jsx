@@ -18,6 +18,8 @@ function App() {
   const [message, setMessage] = useState("");
   const [reportsRefreshKey, setReportsRefreshKey] = useState(0);
 
+  const [unit, setUnit] = useState("pcs");
+
   // Stock in/out fields
   const [stockInProduct, setStockInProduct] = useState("");
   const [stockInQty, setStockInQty] = useState("");
@@ -32,6 +34,9 @@ function App() {
   const [newProductMinStock, setNewProductMinStock] = useState("");
 
   const [searchTerm, setSearchTerm] = useState("");
+
+  const [newProductUnit, setNewProductUnit] = useState("pcs");
+  const [stockInUnit, setStockInUnit] = useState("pcs");
 
   // Fetch Inventory
   const fetchInventory = async () => {
@@ -76,6 +81,7 @@ function App() {
         name: newProductName,
         minStock: Number(newProductMinStock) || 5,
         initialQty: Number(newProductQty) || 0,
+        unit: newProductUnit,
       });
       setNewProductName("");
       setNewProductMinStock("");
@@ -97,6 +103,7 @@ function App() {
         product: stockInProduct,
         quantity: Number(stockInQty),
         source: "Main Hotel",
+        unit: stockInUnit,
       });
       setStockInProduct("");
       setStockInQty("");
@@ -118,6 +125,7 @@ function App() {
         quantity: Number(stockOutQty),
         usedBy,
         floor,
+        unit,
       });
       setStockOutProduct("");
       setStockOutQty("");
@@ -214,6 +222,23 @@ function App() {
           onChange={(e) => setNewProductQty(e.target.value)}
         />
 
+        <select
+          style={{
+            padding: "8px",
+            borderRadius: "8px",
+            outline: "none",
+            marginRight: "1.2rem",
+            marginBlock: "5px",
+          }}
+          value={newProductUnit}
+          onChange={(e) => setNewProductUnit(e.target.value)}
+          placeholder="Unit (pcs, carton, bag)"
+        >
+          <option value="pcs">pcs</option>
+          <option value="carton">carton</option>
+          <option value="bag">bag</option>
+        </select>
+
         <input
           className="input"
           type="number"
@@ -244,7 +269,7 @@ function App() {
           <option value="">Select Product</option>
           {items.map((item) => (
             <option key={item._id} value={item._id}>
-              {item.product}
+              {item.product} {item.unit}
             </option>
           ))}
         </select>
@@ -256,6 +281,22 @@ function App() {
           value={stockInQty}
           onChange={(e) => setStockInQty(e.target.value)}
         />
+
+        <select
+          style={{
+            padding: "8px",
+            borderRadius: "8px",
+            outline: "none",
+            marginRight: "1.2rem",
+            marginBlock: "5px",
+          }}
+          value={stockInUnit}
+          onChange={(e) => setStockInUnit(e.target.value)}
+        >
+          <option value="pcs">pcs</option>
+          <option value="carton">carton</option>
+          <option value="bag">bag</option>
+        </select>
 
         <button
           onClick={handleStockIn}
@@ -279,7 +320,7 @@ function App() {
           <option value="">Select Product</option>
           {items.map((item) => (
             <option key={item._id} value={item._id}>
-              {item.product}
+              {item.product} {item.unit}
             </option>
           ))}
         </select>
@@ -291,6 +332,22 @@ function App() {
           value={stockOutQty}
           onChange={(e) => setStockOutQty(e.target.value)}
         />
+
+        <select
+          style={{
+            padding: "8px",
+            borderRadius: "8px",
+            outline: "none",
+            marginRight: "1.2rem",
+            marginBlock: "5px",
+          }}
+          value={newProductUnit}
+          onChange={(e) => setUnit(e.target.value)}
+        >
+          <option value="pcs">pcs</option>
+          <option value="carton">carton</option>
+          <option value="bag">bag</option>
+        </select>
 
         <input
           className="input"
@@ -330,25 +387,53 @@ function App() {
       <h2 style={{ marginLeft: "65px", marginTop: "100px", fontSize: "35px" }}>
         Current Inventory:
       </h2>
-      <div className="stock-card">
-        {filteredItems.map((item) => {
-          const isLowStock = item.quantity < item.minStock;
-          return (
-            <div
-              key={item._id}
-              className={`title ${isLowStock ? "low-stock" : "high-stock"}`}
-            >
-              <FaBox size={18} />
-              <h3>{item.product}</h3>
-              <p>Qty: {item.quantity}</p>
-              <button onClick={() => handleDeleteProduct(item._id)}>
-                Delete 🗑
-              </button>
-            </div>
-          );
-        })}
-      </div>
 
+      <table className="inventory-table">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Quantity</th>
+            <th>Unit</th>
+            <th>Status</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {[...filteredItems]
+            .sort((a, b) => {
+              const aLow = a.quantity < 4;
+              const bLow = b.quantity < 4;
+              return aLow - bLow; // الأخضر فوق، الأحمر تحت
+            })
+            .map((item) => {
+              const isLowStock = item.quantity < 4;
+
+              return (
+                <tr key={item._id}>
+                  <td>{item.product}</td>
+                  <td>{item.quantity}</td>
+                  <td>{item.unit}</td>
+
+                  <td>
+                    <span
+                      className={`status-dot ${isLowStock ? "red" : "green"}`}
+                    />
+                  </td>
+
+                  <td>
+                    <button
+                      className="delete-btn"
+                      onClick={() => handleDeleteProduct(item._id)}
+                    >
+                      Delete 🗑
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+        </tbody>
+      </table>
       {/* Dashboard يظهر مرة واحدة فقط تحت */}
       {/* <Dashboard refreshKey={reportsRefreshKey} /> */}
 
