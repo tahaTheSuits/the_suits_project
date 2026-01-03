@@ -15,17 +15,19 @@ export default function Reports() {
 
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
+  const [loading, setLoading] = useState(true);
 
   // ====== Fetch Reports ======
   const fetchReports = async () => {
     try {
+      setLoading(true);
       setError("");
       const [dailyOutRes, weeklyOutRes, dailyInRes, weeklyInRes] =
         await Promise.all([
-          axios.get("http://localhost:5000/api/reports/stock-out/daily"),
-          axios.get("http://localhost:5000/api/reports/stock-out/weekly"),
-          axios.get("http://localhost:5000/api/reports/stock-in/daily"),
-          axios.get("http://localhost:5000/api/reports/stock-in/weekly"),
+          axios.get("http://192.168.130.239:5000/api/reports/stock-out/daily"),
+          axios.get("http://192.168.130.239:5000/api/reports/stock-out/weekly"),
+          axios.get("http://192.168.130.239:5000/api/reports/stock-in/daily"),
+          axios.get("http://192.168.130.239:5000/api/reports/stock-in/weekly"),
         ]);
 
       setDailyStockOut(dailyOutRes.data || []);
@@ -35,6 +37,8 @@ export default function Reports() {
     } catch (err) {
       console.error(err);
       setError("Failed to fetch reports");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -49,7 +53,7 @@ export default function Reports() {
   const exportExcel = async (type, period) => {
     try {
       setError("");
-      const url = `http://localhost:5000/api/export/${type}/excel?from=${fromDate}&to=${toDate}`;
+      const url = `http://192.168.130.239:5000/api/export/${type}/excel?from=${fromDate}&to=${toDate}`;
       const res = await axios.get(url, { responseType: "blob" });
       saveAs(res.data, `${type}-${period}-report.xlsx`);
     } catch (err) {
@@ -61,7 +65,7 @@ export default function Reports() {
   const exportPDF = async (type, period) => {
     try {
       setError("");
-      const url = `http://localhost:5000/api/export/${type}/pdf?from=${fromDate}&to=${toDate}`;
+      const url = `http://192.168.130.239:5000/api/export/${type}/pdf?from=${fromDate}&to=${toDate}`;
       const res = await axios.get(url, { responseType: "blob" });
       saveAs(res.data, `${type}-${period}-report.pdf`);
     } catch (err) {
@@ -98,147 +102,145 @@ export default function Reports() {
       </div>
 
       {/* Export Buttons */}
-      <div className="export-wrapper">
-        <button className="export-btn">Export ▼</button>
+      <div className="export-container">
+        <div className="export-wrapper">
+          <button className="export-btn">Export ▼</button>
 
-        <div className="export-menu">
-          <div className="export-section">
-            <span>Stock In:</span>
-            <button onClick={() => exportPDF("stock-in")}>PDF</button>
-            <button onClick={() => exportExcel("stock-in")}>Excel</button>
-          </div>
-          <div className="export-section">
-            <span>Stock Out:</span>
-            <button onClick={() => exportPDF("stock-out")}>PDF</button>
-            <button onClick={() => exportExcel("stock-out")}>Excel</button>
+          <div className="export-menu">
+            <div className="export-section">
+              <span>Stock In:</span>
+              <button onClick={() => exportPDF("stock-in")}>PDF</button>
+              <button onClick={() => exportExcel("stock-in")}>Excel</button>
+            </div>
+            <div className="export-section">
+              <span>Stock Out:</span>
+              <button onClick={() => exportPDF("stock-out")}>PDF</button>
+              <button onClick={() => exportExcel("stock-out")}>Excel</button>
+            </div>
           </div>
         </div>
       </div>
       {/* Tables */}
-      <h2
-        className="reports-section-title"
-        style={{
-          marginTop: "300px",
-          marginLeft: "220px",
-          marginBottom: "-180px",
-          fontSize: "30px",
-        }}
-      >
-        Daily Stock Out:
-      </h2>
-      <table className="reports-table" style={{ marginTop: "200px" }}>
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Product</th>
-            <th>Quantity</th>
-            <th>Unit</th>
-            <th>Floor</th>
-            <th>Used By</th>
-          </tr>
-        </thead>
-        <tbody>
-          {dailyStockOut.map((item) => (
-            <tr key={item._id}>
-              <td>{formatDate(item.date)}</td>
-              <td>{item.productName}</td>
-              <td>{item.quantity}</td>
-              <td>{item.unit}</td>
-              <td>{item.floor || "-"}</td>
-              <td>{item.usedBy || "-"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <h2 className="reports-section-title">Daily Stock Out:</h2>
+      <div className="table-wrapper">
+        {loading ? (
+          <p
+            style={{
+              textAlign: "center",
+              padding: "20px",
+              fontSize: "30px",
+              color: "red",
+            }}
+          >
+            Loading inventory...
+          </p>
+        ) : (
+          <table className="reports-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Product</th>
+                <th>Quantity</th>
+                <th>Unit</th>
+                <th>Floor</th>
+                <th>Used By</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dailyStockOut.map((item) => (
+                <tr key={item._id}>
+                  <td>{formatDate(item.date)}</td>
+                  <td>{item.productName}</td>
+                  <td>{item.quantity}</td>
+                  <td>{item.unit}</td>
+                  <td>{item.floor || "-"}</td>
+                  <td>{item.usedBy || "-"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
 
-      <h2
-        className="reports-section-title"
-        style={{ marginLeft: "220px", fontSize: "30px" }}
-      >
-        Weekly Stock Out:
-      </h2>
-      <table className="reports-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Product</th>
-            <th>Quantity</th>
-            <th>Unit</th>
-            <th>Floor</th>
-            <th>Used By</th>
-          </tr>
-        </thead>
-        <tbody>
-          {weeklyStockOut.map((item) => (
-            <tr key={item._id}>
-              <td>{formatDate(item.date)}</td>
-              <td>{item.productName}</td>
-              <td>{item.quantity}</td>
-              <td>{item.unit}</td>
-              <td>{item.floor || "-"}</td>
-              <td>{item.usedBy || "-"}</td>
+      <h2 className="reports-section-title">Weekly Stock Out:</h2>
+      <div className="table-wrapper">
+        <table className="reports-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Product</th>
+              <th>Quantity</th>
+              <th>Unit</th>
+              <th>Floor</th>
+              <th>Used By</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {weeklyStockOut.map((item) => (
+              <tr key={item._id}>
+                <td>{formatDate(item.date)}</td>
+                <td>{item.productName}</td>
+                <td>{item.quantity}</td>
+                <td>{item.unit}</td>
+                <td>{item.floor || "-"}</td>
+                <td>{item.usedBy || "-"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-      <h2
-        className="reports-section-title"
-        style={{ marginLeft: "220px", fontSize: "30px" }}
-      >
-        Daily Stock In:
-      </h2>
-      <table className="reports-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Product</th>
-            <th>Quantity</th>
-            <th>Unit</th>
-            <th>Source</th>
-          </tr>
-        </thead>
-        <tbody>
-          {dailyStockIn.map((item) => (
-            <tr key={item._id}>
-              <td>{formatDate(item.date)}</td>
-              <td>{item.productName}</td>
-              <td>{item.quantity}</td>
-              <td>{item.unit}</td>
-              <td>{item.source || "-"}</td>
+      <h2 className="reports-section-title">Daily Stock In:</h2>
+      <div className="table-wrapper">
+        <table className="reports-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Product</th>
+              <th>Quantity</th>
+              <th>Unit</th>
+              <th>Source</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {dailyStockIn.map((item) => (
+              <tr key={item._id}>
+                <td>{formatDate(item.date)}</td>
+                <td>{item.productName}</td>
+                <td>{item.quantity}</td>
+                <td>{item.unit}</td>
+                <td>{item.source || "-"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
-      <h2
-        className="reports-section-title"
-        style={{ marginLeft: "220px", fontSize: "30px" }}
-      >
-        Weekly Stock In:
-      </h2>
-      <table className="reports-table">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Product</th>
-            <th>Quantity</th>
-            <th>Unit</th>
-            <th>Source</th>
-          </tr>
-        </thead>
-        <tbody>
-          {weeklyStockIn.map((item) => (
-            <tr key={item._id}>
-              <td>{formatDate(item.date)}</td>
-              <td>{item.productName}</td>
-              <td>{item.quantity}</td>
-              <td>{item.unit}</td>
-              <td>{item.source || "-"}</td>
+      <h2 className="reports-section-title">Weekly Stock In:</h2>
+      <div className="table-wrapper">
+        <table className="reports-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Product</th>
+              <th>Quantity</th>
+              <th>Unit</th>
+              <th>Source</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {weeklyStockIn.map((item) => (
+              <tr key={item._id}>
+                <td>{formatDate(item.date)}</td>
+                <td>{item.productName}</td>
+                <td>{item.quantity}</td>
+                <td>{item.unit}</td>
+                <td>{item.source || "-"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

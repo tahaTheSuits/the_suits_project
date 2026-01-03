@@ -19,6 +19,7 @@ function App() {
   const [reportsRefreshKey, setReportsRefreshKey] = useState(0);
 
   const [unit, setUnit] = useState("pcs");
+  const [loading, setLoading] = useState(true);
 
   // Stock in/out fields
   const [stockInProduct, setStockInProduct] = useState("");
@@ -41,19 +42,24 @@ function App() {
   // Fetch Inventory
   const fetchInventory = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/inventory");
+      setLoading(true);
+      const res = await axios.get("http://192.168.130.239:5000/api/inventory");
       dispatch(setInventory(res.data || []));
       setMessage("");
     } catch (err) {
       console.error(err);
       setMessage("Error fetching inventory");
+    } finally {
+      setLoading(false);
     }
   };
 
   // Fetch Daily Report
   const fetchDailyReport = async () => {
     try {
-      const res = await axios.get("http://localhost:5000/api/daily-reports");
+      const res = await axios.get(
+        "http://192.168.130.239:5000/api/daily-reports"
+      );
       dispatch(setDailyReport(res.data || []));
     } catch (err) {
       console.error(err);
@@ -67,6 +73,14 @@ function App() {
     setReportsRefreshKey((prev) => prev + 1);
   };
 
+  // const fetchItems = async () => {
+  //   setLoading(true);
+  //   const res = await fetch(...);
+  //   const data = await res.json();
+  //   setItems(data);
+  //   setLoading(false)
+  // }
+
   useEffect(() => {
     document.title = "The Suits Warehouse";
     refreshAll();
@@ -77,7 +91,7 @@ function App() {
   const handleAddNewProduct = async () => {
     if (!newProductName.trim()) return setMessage("Enter product name");
     try {
-      await axios.post("http://localhost:5000/api/products", {
+      await axios.post("http://192.168.130.239:5000/api/products", {
         name: newProductName,
         minStock: Number(newProductMinStock) || 5,
         initialQty: Number(newProductQty) || 0,
@@ -99,7 +113,7 @@ function App() {
     if (!stockInProduct || !stockInQty)
       return setMessage("Select product & quantity");
     try {
-      await axios.post("http://localhost:5000/api/stock-in", {
+      await axios.post("http://192.168.130.239:5000/api/stock-in", {
         product: stockInProduct,
         quantity: Number(stockInQty),
         source: "Main Hotel",
@@ -120,7 +134,7 @@ function App() {
     if (!stockOutProduct || !stockOutQty || !usedBy || !floor)
       return setMessage("Fill all Stock Out fields");
     try {
-      await axios.post("http://localhost:5000/api/stock-out", {
+      await axios.post("http://192.168.130.239:5000/api/stock-out", {
         product: stockOutProduct,
         quantity: Number(stockOutQty),
         usedBy,
@@ -142,7 +156,7 @@ function App() {
   const handleDeleteProduct = async (id) => {
     if (!id) return setMessage("No product ID");
     try {
-      await axios.delete(`http://localhost:5000/api/delete/${id}`);
+      await axios.delete(`http://192.168.130.239:5000/api/delete/${id}`);
       refreshAll();
       setMessage("Product deleted successfully!");
     } catch (err) {
@@ -158,282 +172,249 @@ function App() {
   return (
     <div className="container">
       {/* Header */}
-      <header
-        className="app-header"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "20px",
-          marginBottom: "30px",
-        }}
-      >
-        <img
-          src={logo}
-          alt="Logo"
-          style={{ width: "180px", marginLeft: "-50px", marginTop: "-90px" }}
-        />
-        <h1
-          style={{
-            fontSize: "45px",
-            justifyContent: "center",
-            alignItems: "center",
-            marginLeft: "200px",
-            marginTop: "70px",
-            color: "#333",
-          }}
-        >
+      <header className="app-header">
+        <img className="logo" src={logo} alt="Logo" />
+        <h1 className="title">
           <FaHome /> The Suits Warehouses
         </h1>
       </header>
 
-      {message && (
-        <p
-          style={{
-            color: "red",
-            marginLeft: "350px",
-            marginBottom: "-85px",
-            marginTop: " 100px",
-          }}
-        >
-          {message}
-        </p>
-      )}
+      {message && <p className="error-msg">{message}</p>}
 
       <button onClick={refreshAll} className="btn btn-primary refresh-btn">
         Refresh Data 🔄
       </button>
 
       {/* Add Product */}
-      <div className="card">
-        <h2>Add New Product</h2>
+      <div className="cards-container">
+        <div className="card">
+          <h2>Add New Product</h2>
+          <div className="from-row">
+            <input
+              className="input"
+              placeholder="Product Name"
+              value={newProductName}
+              onChange={(e) => setNewProductName(e.target.value)}
+            />
 
-        <input
-          className="input"
-          placeholder="Product Name"
-          value={newProductName}
-          onChange={(e) => setNewProductName(e.target.value)}
-        />
+            <input
+              className="input"
+              type="number"
+              placeholder="Initial Qty"
+              value={newProductQty}
+              onChange={(e) => setNewProductQty(e.target.value)}
+            />
 
-        <input
-          className="input"
-          type="number"
-          placeholder="Initial Qty"
-          value={newProductQty}
-          onChange={(e) => setNewProductQty(e.target.value)}
-        />
+            <select
+              value={newProductUnit}
+              onChange={(e) => setNewProductUnit(e.target.value)}
+              placeholder="Unit (pcs, carton, bag)"
+            >
+              <option value="pcs">pcs</option>
+              <option value="carton">carton</option>
+              <option value="bag">bag</option>
+            </select>
 
-        <select
-          style={{
-            padding: "8px",
-            borderRadius: "8px",
-            outline: "none",
-            marginRight: "1.2rem",
-            marginBlock: "5px",
-          }}
-          value={newProductUnit}
-          onChange={(e) => setNewProductUnit(e.target.value)}
-          placeholder="Unit (pcs, carton, bag)"
-        >
-          <option value="pcs">pcs</option>
-          <option value="carton">carton</option>
-          <option value="bag">bag</option>
-        </select>
+            <input
+              className="input"
+              type="number"
+              placeholder="Min Stock"
+              value={newProductMinStock}
+              onChange={(e) => setNewProductMinStock(e.target.value)}
+            />
+          </div>
+          <button
+            onClick={handleAddNewProduct}
+            className="btn btn-primary"
+            style={{ width: "140px" }}
+          >
+            Add Product ➕
+          </button>
+        </div>
 
-        <input
-          className="input"
-          type="number"
-          placeholder="Min Stock"
-          value={newProductMinStock}
-          onChange={(e) => setNewProductMinStock(e.target.value)}
-        />
+        {/* Stock In */}
+        <div className="card">
+          <h2>Stock In</h2>
+          <div className="from-row">
+            <select
+              value={stockInProduct}
+              onChange={(e) => setStockInProduct(e.target.value)}
+            >
+              <option value="">Select Product</option>
+              {items.map((item) => (
+                <option key={item._id} value={item._id}>
+                  {item.product} {item.unit}
+                </option>
+              ))}
+            </select>
 
-        <button
-          onClick={handleAddNewProduct}
-          className="btn btn-primary"
-          style={{ width: "140px" }}
-        >
-          Add Product ➕
-        </button>
+            <input
+              className="input"
+              type="number"
+              placeholder="Quantity"
+              value={stockInQty}
+              onChange={(e) => setStockInQty(e.target.value)}
+            />
+
+            <select
+              value={stockInUnit}
+              onChange={(e) => setStockInUnit(e.target.value)}
+            >
+              <option value="pcs">pcs</option>
+              <option value="carton">carton</option>
+              <option value="bag">bag</option>
+            </select>
+          </div>
+          <button
+            onClick={handleStockIn}
+            className="btn btn-primary"
+            style={{ width: "100px" }}
+          >
+            Add 📦
+          </button>
+        </div>
+
+        {/* Stock Out */}
+        <div className="card">
+          <h2>Stock Out</h2>
+          <div className="from-row">
+            <select
+              value={stockOutProduct}
+              onChange={(e) => setStockOutProduct(e.target.value)}
+            >
+              <option value="">Select Product</option>
+              {items.map((item) => (
+                <option key={item._id} value={item._id}>
+                  {item.product} {item.unit}
+                </option>
+              ))}
+            </select>
+
+            <input
+              className="input"
+              type="number"
+              placeholder="Quantity"
+              value={stockOutQty}
+              onChange={(e) => setStockOutQty(e.target.value)}
+            />
+
+            <select
+              style={{
+                padding: "8px",
+                borderRadius: "8px",
+                outline: "none",
+                marginRight: "1.2rem",
+                marginBlock: "5px",
+              }}
+              value={newProductUnit}
+              onChange={(e) => setUnit(e.target.value)}
+            >
+              <option value="pcs">pcs</option>
+              <option value="carton">carton</option>
+              <option value="bag">bag</option>
+            </select>
+
+            <input
+              className="input"
+              placeholder="Floor"
+              value={floor}
+              onChange={(e) => setFloor(e.target.value)}
+            />
+
+            <input
+              className="input"
+              placeholder="Used By"
+              value={usedBy}
+              onChange={(e) => setUsedBy(e.target.value)}
+            />
+          </div>
+          <button
+            onClick={handleStockOut}
+            className="btn btn-danger"
+            style={{ width: "110px", backgroundColor: "#552f0f" }}
+          >
+            Remove 🗑
+          </button>
+        </div>
+
+        {/* Search Inventory */}
+        <div className="card">
+          <h2>Search Inventory 🔍</h2>
+          <div className="from-row">
+            <input
+              className="input"
+              placeholder="Search product..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
       </div>
-
-      {/* Stock In */}
-      <div className="card">
-        <h2>Stock In</h2>
-
-        <select
-          style={{ width: "97.5%", outline: "none" }}
-          className="input"
-          value={stockInProduct}
-          onChange={(e) => setStockInProduct(e.target.value)}
-        >
-          <option value="">Select Product</option>
-          {items.map((item) => (
-            <option key={item._id} value={item._id}>
-              {item.product} {item.unit}
-            </option>
-          ))}
-        </select>
-
-        <input
-          className="input"
-          type="number"
-          placeholder="Quantity"
-          value={stockInQty}
-          onChange={(e) => setStockInQty(e.target.value)}
-        />
-
-        <select
-          style={{
-            padding: "8px",
-            borderRadius: "8px",
-            outline: "none",
-            marginRight: "1.2rem",
-            marginBlock: "5px",
-          }}
-          value={stockInUnit}
-          onChange={(e) => setStockInUnit(e.target.value)}
-        >
-          <option value="pcs">pcs</option>
-          <option value="carton">carton</option>
-          <option value="bag">bag</option>
-        </select>
-
-        <button
-          onClick={handleStockIn}
-          className="btn btn-primary"
-          style={{ width: "100px" }}
-        >
-          Add 📦
-        </button>
-      </div>
-
-      {/* Stock Out */}
-      <div className="card">
-        <h2>Stock Out</h2>
-
-        <select
-          style={{ width: "97.5%" }}
-          className="input"
-          value={stockOutProduct}
-          onChange={(e) => setStockOutProduct(e.target.value)}
-        >
-          <option value="">Select Product</option>
-          {items.map((item) => (
-            <option key={item._id} value={item._id}>
-              {item.product} {item.unit}
-            </option>
-          ))}
-        </select>
-
-        <input
-          className="input"
-          type="number"
-          placeholder="Quantity"
-          value={stockOutQty}
-          onChange={(e) => setStockOutQty(e.target.value)}
-        />
-
-        <select
-          style={{
-            padding: "8px",
-            borderRadius: "8px",
-            outline: "none",
-            marginRight: "1.2rem",
-            marginBlock: "5px",
-          }}
-          value={newProductUnit}
-          onChange={(e) => setUnit(e.target.value)}
-        >
-          <option value="pcs">pcs</option>
-          <option value="carton">carton</option>
-          <option value="bag">bag</option>
-        </select>
-
-        <input
-          className="input"
-          placeholder="Floor"
-          value={floor}
-          onChange={(e) => setFloor(e.target.value)}
-        />
-
-        <input
-          className="input"
-          placeholder="Used By"
-          value={usedBy}
-          onChange={(e) => setUsedBy(e.target.value)}
-        />
-
-        <button
-          onClick={handleStockOut}
-          className="btn btn-danger"
-          style={{ width: "110px", backgroundColor: "#552f0f" }}
-        >
-          Remove 🗑
-        </button>
-      </div>
-
-      {/* Search Inventory */}
-      <div className="card">
-        <h2>Search Inventory 🔍</h2>
-        <input
-          className="input"
-          placeholder="Search product..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
-
       {/* Inventory Grid */}
-      <h2 style={{ marginLeft: "65px", marginTop: "100px", fontSize: "35px" }}>
-        Current Inventory:
-      </h2>
+      <h2 className="inventory-title">Current Inventory:</h2>
+      <div className="inventory-table-wrapper">
+        {loading ? (
+          <p
+            style={{
+              textAlign: "center",
+              padding: "20px",
+              fontSize: "30px",
+              color: "red",
+            }}
+          >
+            Loading inventory...
+          </p>
+        ) : (
+          <table className="inventory-table">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Quantity</th>
+                <th>Unit</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
 
-      <table className="inventory-table">
-        <thead>
-          <tr>
-            <th>Product</th>
-            <th>Quantity</th>
-            <th>Unit</th>
-            <th>Status</th>
-            <th>Action</th>
-          </tr>
-        </thead>
+            <tbody>
+              {[...filteredItems]
+                .sort((a, b) => {
+                  const aLow = a.quantity < 1;
+                  const bLow = b.quantity < 4;
+                  return aLow - bLow; // الأخضر فوق، الأحمر تحت
+                })
+                .map((item) => {
+                  const isLowStock = item.quantity < 1;
 
-        <tbody>
-          {[...filteredItems]
-            .sort((a, b) => {
-              const aLow = a.quantity < 4;
-              const bLow = b.quantity < 4;
-              return aLow - bLow; // الأخضر فوق، الأحمر تحت
-            })
-            .map((item) => {
-              const isLowStock = item.quantity < 4;
+                  return (
+                    <tr key={item._id}>
+                      <td data-label="product">{item.product}</td>
+                      <td data-label="quantity">{item.quantity}</td>
+                      <td data-label="unit">{item.unit}</td>
 
-              return (
-                <tr key={item._id}>
-                  <td>{item.product}</td>
-                  <td>{item.quantity}</td>
-                  <td>{item.unit}</td>
+                      <td data-label="status">
+                        <span
+                          className={`status-dot ${
+                            isLowStock ? "red" : "green"
+                          }`}
+                        />
+                      </td>
 
-                  <td>
-                    <span
-                      className={`status-dot ${isLowStock ? "red" : "green"}`}
-                    />
-                  </td>
-
-                  <td>
-                    <button
-                      className="delete-btn"
-                      onClick={() => handleDeleteProduct(item._id)}
-                    >
-                      Delete 🗑
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-        </tbody>
-      </table>
+                      <td data-label="action">
+                        <button
+                          className="delete-btn"
+                          onClick={() => handleDeleteProduct(item._id)}
+                        >
+                          Delete
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
+        )}
+      </div>
       {/* Dashboard يظهر مرة واحدة فقط تحت */}
       {/* <Dashboard refreshKey={reportsRefreshKey} /> */}
 
