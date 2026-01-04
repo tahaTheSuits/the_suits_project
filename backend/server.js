@@ -19,8 +19,8 @@ const app = express();
 // Middleware
 app.use(express.json());
 app.use(cors(
-    { origin: 'http://thesuits.netlify.app', 
-        credentials: true, 
+    { origin: 'https://thesuits.netlify.app', 
+        //credentials: true, 
     }
 ));
 //app.use('/api',require('./routes/stockRoutes'));
