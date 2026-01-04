@@ -24,10 +24,18 @@ export default function Reports() {
       setError("");
       const [dailyOutRes, weeklyOutRes, dailyInRes, weeklyInRes] =
         await Promise.all([
-          axios.get("http://192.168.130.239:5000/api/reports/stock-out/daily"),
-          axios.get("http://192.168.130.239:5000/api/reports/stock-out/weekly"),
-          axios.get("http://192.168.130.239:5000/api/reports/stock-in/daily"),
-          axios.get("http://192.168.130.239:5000/api/reports/stock-in/weekly"),
+          axios.get(
+            "https://the-suits-project.onrender.com/api/reports/stock-out/daily"
+          ),
+          axios.get(
+            "https://the-suits-project.onrender.com/api/reports/stock-out/weekly"
+          ),
+          axios.get(
+            "https://the-suits-project.onrender.com/api/reports/stock-in/daily"
+          ),
+          axios.get(
+            "https://the-suits-project.onrender.com/api/reports/stock-in/weekly"
+          ),
         ]);
 
       setDailyStockOut(dailyOutRes.data || []);
@@ -53,7 +61,7 @@ export default function Reports() {
   const exportExcel = async (type, period) => {
     try {
       setError("");
-      const url = `http://192.168.130.239:5000/api/export/${type}/excel?from=${fromDate}&to=${toDate}`;
+      const url = `https://the-suits-project.onrender.com/api/export/${type}/excel?from=${fromDate}&to=${toDate}`;
       const res = await axios.get(url, { responseType: "blob" });
       saveAs(res.data, `${type}-${period}-report.xlsx`);
     } catch (err) {
@@ -65,7 +73,7 @@ export default function Reports() {
   const exportPDF = async (type, period) => {
     try {
       setError("");
-      const url = `http://192.168.130.239:5000/api/export/${type}/pdf?from=${fromDate}&to=${toDate}`;
+      const url = `https://the-suits-project.onrender.com/api/export/${type}/pdf?from=${fromDate}&to=${toDate}`;
       const res = await axios.get(url, { responseType: "blob" });
       saveAs(res.data, `${type}-${period}-report.pdf`);
     } catch (err) {

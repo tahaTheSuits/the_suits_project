@@ -43,7 +43,9 @@ function App() {
   const fetchInventory = async () => {
     try {
       setLoading(true);
-      const res = await axios.get("http://192.168.130.239:5000/api/inventory");
+      const res = await axios.get(
+        "https://the-suits-project.onrender.com/api/inventory"
+      );
       dispatch(setInventory(res.data || []));
       setMessage("");
     } catch (err) {
@@ -58,7 +60,7 @@ function App() {
   const fetchDailyReport = async () => {
     try {
       const res = await axios.get(
-        "http://192.168.130.239:5000/api/daily-reports"
+        "https://the-suits-project.onrender.com/api/daily-reports"
       );
       dispatch(setDailyReport(res.data || []));
     } catch (err) {
@@ -91,7 +93,7 @@ function App() {
   const handleAddNewProduct = async () => {
     if (!newProductName.trim()) return setMessage("Enter product name");
     try {
-      await axios.post("http://192.168.130.239:5000/api/products", {
+      await axios.post("https://the-suits-project.onrender.com/api/products", {
         name: newProductName,
         minStock: Number(newProductMinStock) || 5,
         initialQty: Number(newProductQty) || 0,
@@ -113,7 +115,7 @@ function App() {
     if (!stockInProduct || !stockInQty)
       return setMessage("Select product & quantity");
     try {
-      await axios.post("http://192.168.130.239:5000/api/stock-in", {
+      await axios.post("https://the-suits-project.onrender.com/api/stock-in", {
         product: stockInProduct,
         quantity: Number(stockInQty),
         source: "Main Hotel",
@@ -134,7 +136,7 @@ function App() {
     if (!stockOutProduct || !stockOutQty || !usedBy || !floor)
       return setMessage("Fill all Stock Out fields");
     try {
-      await axios.post("http://192.168.130.239:5000/api/stock-out", {
+      await axios.post("https://the-suits-project.onrender.com/api/stock-out", {
         product: stockOutProduct,
         quantity: Number(stockOutQty),
         usedBy,
@@ -156,7 +158,9 @@ function App() {
   const handleDeleteProduct = async (id) => {
     if (!id) return setMessage("No product ID");
     try {
-      await axios.delete(`http://192.168.130.239:5000/api/delete/${id}`);
+      await axios.delete(
+        `https://the-suits-project.onrender.com/api/delete/${id}`
+      );
       refreshAll();
       setMessage("Product deleted successfully!");
     } catch (err) {
