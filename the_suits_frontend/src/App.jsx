@@ -212,10 +212,10 @@ function App() {
             <select
               value={newProductUnit}
               onChange={(e) => setNewProductUnit(e.target.value)}
-              placeholder="Unit (pcs, carton, bag)"
+              placeholder="Unit (pcs, galon, bag)"
             >
               <option value="pcs">pcs</option>
-              <option value="carton">carton</option>
+              <option value="galon">galon</option>
               <option value="bag">bag</option>
             </select>
 
@@ -265,7 +265,7 @@ function App() {
               onChange={(e) => setStockInUnit(e.target.value)}
             >
               <option value="pcs">pcs</option>
-              <option value="carton">carton</option>
+              <option value="galon">galon</option>
               <option value="bag">bag</option>
             </select>
           </div>
@@ -314,7 +314,7 @@ function App() {
               onChange={(e) => setUnit(e.target.value)}
             >
               <option value="pcs">pcs</option>
-              <option value="carton">carton</option>
+              <option value="galon">galon</option>
               <option value="bag">bag</option>
             </select>
 
