@@ -27,7 +27,7 @@ const stockOutSchema = new mongoose.Schema(
     },
         unit: {
       type: String,
-      enum: ["pcs", "carton", "bag"],
+      enum: ["pcs", "galon", "bag"],
       default: "pcs"
     },
     note: String
