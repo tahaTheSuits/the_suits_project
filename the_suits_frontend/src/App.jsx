@@ -26,8 +26,8 @@ function App() {
   const [stockInQty, setStockInQty] = useState("");
   const [stockOutProduct, setStockOutProduct] = useState("");
   const [stockOutQty, setStockOutQty] = useState("");
-  const [usedBy, setUsedBy] = useState("");
-  const [floor, setFloor] = useState("");
+  // const [usedBy, setUsedBy] = useState("");
+  // const [floor, setFloor] = useState("");
 
   // New product
   const [newProductName, setNewProductName] = useState("");
@@ -44,7 +44,7 @@ function App() {
     try {
       setLoading(true);
       const res = await axios.get(
-        "https://the-suits-project.onrender.com/api/inventory"
+        "https://the-suits-project.onrender.com/api/inventory",
       );
       dispatch(setInventory(res.data || []));
       setMessage("");
@@ -60,7 +60,7 @@ function App() {
   const fetchDailyReport = async () => {
     try {
       const res = await axios.get(
-        "https://the-suits-project.onrender.com/api/daily-reports"
+        "https://the-suits-project.onrender.com/api/daily-reports",
       );
       dispatch(setDailyReport(res.data || []));
     } catch (err) {
@@ -84,7 +84,7 @@ function App() {
   // }
 
   useEffect(() => {
-    document.title = "The Suits Warehouse";
+    document.title = "The Suites Warehouse";
     refreshAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -133,20 +133,21 @@ function App() {
 
   // Stock Out
   const handleStockOut = async () => {
-    if (!stockOutProduct || !stockOutQty || !usedBy || !floor)
+    if (!stockOutProduct || !stockOutQty)
+      // || !usedBy || !floor
       return setMessage("Fill all Stock Out fields");
     try {
       await axios.post("https://the-suits-project.onrender.com/api/stock-out", {
         product: stockOutProduct,
         quantity: Number(stockOutQty),
-        usedBy,
-        floor,
+        // usedBy,
+        // floor,
         unit,
       });
       setStockOutProduct("");
       setStockOutQty("");
-      setUsedBy("");
-      setFloor("");
+      // setUsedBy("");
+      // setFloor("");
       refreshAll();
       setMessage("Stock Out successful!");
     } catch (err) {
@@ -159,7 +160,7 @@ function App() {
     if (!id) return setMessage("No product ID");
     try {
       await axios.delete(
-        `https://the-suits-project.onrender.com/api/delete/${id}`
+        `https://the-suits-project.onrender.com/api/delete/${id}`,
       );
       refreshAll();
       setMessage("Product deleted successfully!");
@@ -170,7 +171,7 @@ function App() {
   };
 
   const filteredItems = items.filter((item) =>
-    item.product.toLowerCase().includes(searchTerm.toLowerCase())
+    item.product.toLowerCase().includes(searchTerm.toLowerCase()),
   );
 
   return (
@@ -179,7 +180,7 @@ function App() {
       <header className="app-header">
         <img className="logo" src={logo} alt="Logo" />
         <h1 className="title">
-          <FaHome /> The Suits Warehouses
+          <FaHome /> The Suites Warehouses
         </h1>
       </header>
 
@@ -219,13 +220,13 @@ function App() {
               <option value="bag">bag</option>
             </select>
 
-            <input
+            {/* <input
               className="input"
               type="number"
               placeholder="Min Stock"
               value={newProductMinStock}
               onChange={(e) => setNewProductMinStock(e.target.value)}
-            />
+            /> */}
           </div>
           <button
             onClick={handleAddNewProduct}
@@ -318,19 +319,19 @@ function App() {
               <option value="bag">bag</option>
             </select>
 
-            <input
+            {/* <input
               className="input"
               placeholder="Floor"
               value={floor}
               onChange={(e) => setFloor(e.target.value)}
-            />
+            /> */}
 
-            <input
+            {/* <input
               className="input"
               placeholder="Used By"
               value={usedBy}
               onChange={(e) => setUsedBy(e.target.value)}
-            />
+            /> */}
           </div>
           <button
             onClick={handleStockOut}

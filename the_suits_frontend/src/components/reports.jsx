@@ -25,16 +25,16 @@ export default function Reports() {
       const [dailyOutRes, weeklyOutRes, dailyInRes, weeklyInRes] =
         await Promise.all([
           axios.get(
-            "https://the-suits-project.onrender.com/api/reports/stock-out/daily"
+            "https://the-suits-project.onrender.com/api/reports/stock-out/daily",
           ),
           axios.get(
-            "https://the-suits-project.onrender.com/api/reports/stock-out/weekly"
+            "https://the-suits-project.onrender.com/api/reports/stock-out/weekly",
           ),
           axios.get(
-            "https://the-suits-project.onrender.com/api/reports/stock-in/daily"
+            "https://the-suits-project.onrender.com/api/reports/stock-in/daily",
           ),
           axios.get(
-            "https://the-suits-project.onrender.com/api/reports/stock-in/weekly"
+            "https://the-suits-project.onrender.com/api/reports/stock-in/weekly",
           ),
         ]);
 
@@ -150,8 +150,8 @@ export default function Reports() {
                 <th>Product</th>
                 <th>Quantity</th>
                 <th>Unit</th>
-                <th>Floor</th>
-                <th>Used By</th>
+                {/* <th>Floor</th>
+                <th>Used By</th> */}
               </tr>
             </thead>
             <tbody>
@@ -161,8 +161,8 @@ export default function Reports() {
                   <td>{item.productName}</td>
                   <td>{item.quantity}</td>
                   <td>{item.unit}</td>
-                  <td>{item.floor || "-"}</td>
-                  <td>{item.usedBy || "-"}</td>
+                  {/* <td>{item.floor || "-"}</td>
+                  <td>{item.usedBy || "-"}</td> */}
                 </tr>
               ))}
             </tbody>
@@ -179,8 +179,8 @@ export default function Reports() {
               <th>Product</th>
               <th>Quantity</th>
               <th>Unit</th>
-              <th>Floor</th>
-              <th>Used By</th>
+              {/* <th>Floor</th>
+              <th>Used By</th> */}
             </tr>
           </thead>
           <tbody>
@@ -190,8 +190,8 @@ export default function Reports() {
                 <td>{item.productName}</td>
                 <td>{item.quantity}</td>
                 <td>{item.unit}</td>
-                <td>{item.floor || "-"}</td>
-                <td>{item.usedBy || "-"}</td>
+                {/* <td>{item.floor || "-"}</td>
+                <td>{item.usedBy || "-"}</td> */}
               </tr>
             ))}
           </tbody>
@@ -207,7 +207,7 @@ export default function Reports() {
               <th>Product</th>
               <th>Quantity</th>
               <th>Unit</th>
-              <th>Source</th>
+              {/* <th>Source</th> */}
             </tr>
           </thead>
           <tbody>
@@ -217,7 +217,7 @@ export default function Reports() {
                 <td>{item.productName}</td>
                 <td>{item.quantity}</td>
                 <td>{item.unit}</td>
-                <td>{item.source || "-"}</td>
+                {/* <td>{item.source || "-"}</td> */}
               </tr>
             ))}
           </tbody>
@@ -233,7 +233,7 @@ export default function Reports() {
               <th>Product</th>
               <th>Quantity</th>
               <th>Unit</th>
-              <th>Source</th>
+              {/* <th>Source</th> */}
             </tr>
           </thead>
           <tbody>
@@ -243,7 +243,7 @@ export default function Reports() {
                 <td>{item.productName}</td>
                 <td>{item.quantity}</td>
                 <td>{item.unit}</td>
-                <td>{item.source || "-"}</td>
+                {/* <td>{item.source || "-"}</td> */}
               </tr>
             ))}
           </tbody>
