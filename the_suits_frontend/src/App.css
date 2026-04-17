@@ -261,7 +261,7 @@ select:focus {
 .inventory-table th,
 .inventory-table td {
   padding: 0.8rem 0.75rem;
-  border-bottom: 1px solid #e2e7df;
+  border-bottom: 1px solid #b7c1ba;
 }
 
 .inventory-table tbody tr:hover {
@@ -360,7 +360,7 @@ select:focus {
   }
 
   .inventory-table tr {
-    border-bottom: 1px solid #ebeff6;
+    border-bottom: 1px solid #b7c1ba;
     padding: 0.65rem 0.65rem 0.45rem;
   }
 
