@@ -13,10 +13,10 @@
   --primary-hover: #51655e;
   --danger: #5f756d;
   --danger-hover: #51655e;
-  --ok-bg: #e7efe9;
-  --ok-text: #335349;
-  --low-bg: #ece8db;
-  --low-text: #5f695f;
+  --ok-bg: #e8f5e9;
+  --ok-text: #2e7d32;
+  --low-bg: #f9e7e7;
+  --low-text: #b94a48;
   --shadow: 0 12px 28px rgba(31, 41, 38, 0.1);
 }
 
