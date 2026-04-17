@@ -18,7 +18,7 @@ function App() {
   const [message, setMessage] = useState("");
   const [reportsRefreshKey, setReportsRefreshKey] = useState(0);
 
-  const [unit, setUnit] = useState("pcs");
+  const [stockOutUnit, setStockOutUnit] = useState("pcs");
   const [loading, setLoading] = useState(true);
 
   // Stock in/out fields
@@ -138,14 +138,13 @@ function App() {
       return setMessage("Fill all Stock Out fields");
     try {
       await axios.post("https://the-suits-project.onrender.com/api/stock-out", {
-        product: stockOutProduct,
+        productId: stockOutProduct,
         quantity: Number(stockOutQty),
-        // usedBy,
-        // floor,
-        unit,
+        unit: stockOutUnit,
       });
       setStockOutProduct("");
       setStockOutQty("");
+      setStockOutUnit("pcs");
       // setUsedBy("");
       // setFloor("");
       refreshAll();
@@ -311,11 +310,11 @@ function App() {
                 marginRight: "1.2rem",
                 marginBlock: "5px",
               }}
-              value={newProductUnit}
-              onChange={(e) => setUnit(e.target.value)}
+              value={stockOutUnit}
+              onChange={(e) => setStockOutUnit(e.target.value)}
             >
               <option value="pcs">pcs</option>
-              <option value="galon">galon</option>
+              <option value="gallon">gallon</option>
               <option value="bag">bag</option>
             </select>
 
