@@ -108,7 +108,7 @@ function App() {
 
   useEffect(() => {
     const lowStockItems = items.filter(
-      (item) => Number(item.quantity) <= Number(item.minStock || 1),
+      (item) => Number(item.quantity) < Number(item.minStock || 1),
     ).length;
 
     setStats((prev) => ({
@@ -234,19 +234,19 @@ function App() {
       </button>
 
       <section className="stats-grid">
-        <article className="stat-card">
+        <article className="stat-card stat-total">
           <p className="stat-label">Total Products</p>
           <h3 className="stat-value">{stats.totalProducts}</h3>
         </article>
-        <article className="stat-card">
+        <article className="stat-card stat-low">
           <p className="stat-label">Low Stock Items</p>
           <h3 className="stat-value">{stats.lowStockItems}</h3>
         </article>
-        <article className="stat-card">
+        <article className="stat-card stat-in">
           <p className="stat-label">Stock In Today</p>
           <h3 className="stat-value">{stats.stockInToday}</h3>
         </article>
-        <article className="stat-card">
+        <article className="stat-card stat-out">
           <p className="stat-label">Stock Out Today</p>
           <h3 className="stat-value">{stats.stockOutToday}</h3>
         </article>
@@ -406,11 +406,11 @@ function App() {
         </div>
 
         {/* Search Inventory */}
-        <div className="card">
+        <div className="card search-card">
           <h2>Search Inventory 🔍</h2>
           <div className="from-row">
             <input
-              className="input"
+              className="input search-input"
               placeholder="Search product..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
