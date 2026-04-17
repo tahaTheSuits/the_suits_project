@@ -15,6 +15,12 @@ function App() {
   const items = useSelector((state) => state.inventory.items || []);
   const [message, setMessage] = useState("");
   const [reportsRefreshKey, setReportsRefreshKey] = useState(0);
+  const [stats, setStats] = useState({
+    totalProducts: 0,
+    lowStockItems: 0,
+    stockInToday: 0,
+    stockOutToday: 0,
+  });
 
   const [stockOutUnit, setStockOutUnit] = useState("pcs");
   const [loading, setLoading] = useState(true);
@@ -67,11 +73,50 @@ function App() {
     }
   };
 
+  const fetchDashboardStats = async () => {
+    try {
+      const [stockInDailyRes, stockOutDailyRes] = await Promise.all([
+        axios.get("https://the-suits-project.onrender.com/api/reports/stock-in/daily"),
+        axios.get("https://the-suits-project.onrender.com/api/reports/stock-out/daily"),
+      ]);
+
+      const stockInToday = (stockInDailyRes.data || []).reduce(
+        (sum, entry) => sum + (Number(entry.quantity) || 0),
+        0,
+      );
+      const stockOutToday = (stockOutDailyRes.data || []).reduce(
+        (sum, entry) => sum + (Number(entry.quantity) || 0),
+        0,
+      );
+
+      setStats((prev) => ({
+        ...prev,
+        stockInToday,
+        stockOutToday,
+      }));
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const refreshAll = async () => {
     await fetchInventory();
     await fetchDailyReport();
+    await fetchDashboardStats();
     setReportsRefreshKey((prev) => prev + 1);
   };
+
+  useEffect(() => {
+    const lowStockItems = items.filter(
+      (item) => Number(item.quantity) <= Number(item.minStock || 1),
+    ).length;
+
+    setStats((prev) => ({
+      ...prev,
+      totalProducts: items.length,
+      lowStockItems,
+    }));
+  }, [items]);
 
   // const fetchItems = async () => {
   //   setLoading(true);
@@ -188,6 +233,25 @@ function App() {
         Refresh Data
       </button>
 
+      <section className="stats-grid">
+        <article className="stat-card">
+          <p className="stat-label">Total Products</p>
+          <h3 className="stat-value">{stats.totalProducts}</h3>
+        </article>
+        <article className="stat-card">
+          <p className="stat-label">Low Stock Items</p>
+          <h3 className="stat-value">{stats.lowStockItems}</h3>
+        </article>
+        <article className="stat-card">
+          <p className="stat-label">Stock In Today</p>
+          <h3 className="stat-value">{stats.stockInToday}</h3>
+        </article>
+        <article className="stat-card">
+          <p className="stat-label">Stock Out Today</p>
+          <h3 className="stat-value">{stats.stockOutToday}</h3>
+        </article>
+      </section>
+
       <div className="cards-container">
         <div className="card">
           <h2>Add New Product</h2>
@@ -225,13 +289,15 @@ function App() {
               onChange={(e) => setNewProductMinStock(e.target.value)}
             /> */}
           </div>
-          <button
-            onClick={handleAddNewProduct}
-            className="btn btn-primary"
-            style={{ width: "140px" }}
-          >
-            Add Product ➕
-          </button>
+          <div className="card-actions">
+            <button
+              onClick={handleAddNewProduct}
+              className="btn btn-primary"
+              style={{ width: "140px" }}
+            >
+              Add Product
+            </button>
+          </div>
         </div>
 
         {/* Stock In */}
@@ -267,13 +333,15 @@ function App() {
               <option value="bag">bag</option>
             </select>
           </div>
-          <button
-            onClick={handleStockIn}
-            className="btn btn-primary"
-            style={{ width: "100px" }}
-          >
-            Add 📦
-          </button>
+          <div className="card-actions">
+            <button
+              onClick={handleStockIn}
+              className="btn btn-primary"
+              style={{ width: "100px" }}
+            >
+              Add
+            </button>
+          </div>
         </div>
 
         {/* Stock Out */}
@@ -330,13 +398,11 @@ function App() {
               onChange={(e) => setUsedBy(e.target.value)}
             /> */}
           </div>
-          <button
-            onClick={handleStockOut}
-            className="btn btn-danger"
-            style={{ width: "110px", backgroundColor: "#552f0f" }}
-          >
-            Remove 🗑
-          </button>
+          <div className="card-actions">
+            <button onClick={handleStockOut} className="btn btn-danger" style={{ width: "110px" }}>
+              Remove
+            </button>
+          </div>
         </div>
 
         {/* Search Inventory */}
@@ -349,6 +415,9 @@ function App() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
+          </div>
+          <div className="card-actions card-note">
+            <span>Quickly find items by product name.</span>
           </div>
         </div>
       </div>
