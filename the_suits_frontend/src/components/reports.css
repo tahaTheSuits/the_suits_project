@@ -1,9 +1,9 @@
 .reports-container {
   margin-top: 1.75rem;
-  background: #f7f7f8;
-  border: 1px solid #d3d6de;
+  background: #ffffff;
+  border: 1px solid #d9dfd6;
   border-radius: 16px;
-  box-shadow: 0 14px 30px rgba(6, 8, 13, 0.2);
+  box-shadow: 0 12px 28px rgba(31, 41, 38, 0.1);
   padding: 1rem;
 }
 
@@ -36,11 +36,11 @@
   gap: 0.35rem;
   font-size: 0.88rem;
   font-weight: 600;
-  color: #364156;
+  color: #33433f;
 }
 
 .reports-input {
-  border: 1px solid #d9deea;
+  border: 1px solid #d2d9d0;
   border-radius: 10px;
   padding: 0.55rem 0.65rem;
   font-size: 0.9rem;
@@ -48,8 +48,8 @@
 
 .reports-input:focus {
   outline: none;
-  border-color: #8290ab;
-  box-shadow: 0 0 0 3px rgba(130, 144, 171, 0.18);
+  border-color: #819a91;
+  box-shadow: 0 0 0 3px rgba(129, 154, 145, 0.22);
 }
 
 .export-container {
@@ -60,8 +60,8 @@
 }
 
 .export-section {
-  background: #ededf1;
-  border: 1px solid #d4d7de;
+  background: #f8f9f3;
+  border: 1px solid #d9dfd6;
   border-radius: 12px;
   padding: 0.75rem;
   display: grid;
@@ -71,14 +71,14 @@
 .export-section span {
   font-size: 0.88rem;
   font-weight: 700;
-  color: #364156;
+  color: #33433f;
 }
 
 .export-section button {
   border: none;
   border-radius: 8px;
   padding: 0.56rem 0.7rem;
-  background: #8d6a3a;
+  background: #819a91;
   color: #fff;
   font-size: 0.82rem;
   font-weight: 600;
@@ -86,7 +86,7 @@
 }
 
 .export-section button:hover {
-  background: #a17a45;
+  background: #6f8980;
 }
 
 .reports-section-title {
@@ -96,7 +96,7 @@
 
 .table-wrapper {
   overflow-x: auto;
-  border: 1px solid #d4d7df;
+  border: 1px solid #d9dfd6;
   border-radius: 12px;
   background: #fff;
 }
@@ -110,19 +110,19 @@
 .reports-table th,
 .reports-table td {
   padding: 0.72rem 0.68rem;
-  border-bottom: 1px solid #e0e3ea;
+  border-bottom: 1px solid #e2e7df;
   text-align: left;
 }
 
 .reports-table th {
-  background: #e8e9ee;
-  color: #2e333f;
+  background: #f1f4ec;
+  color: #33433f;
   font-size: 0.84rem;
   letter-spacing: 0.2px;
 }
 
 .reports-table tbody tr:hover {
-  background: #f1f3f8;
+  background: #f5f7f0;
 }
 
 .loading-state {

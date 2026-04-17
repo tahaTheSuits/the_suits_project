@@ -1,30 +1,30 @@
 :root {
-  --bg-main: #17191f;
-  --bg-surface: #20232b;
-  --bg-card: #f7f7f8;
-  --bg-subtle: #ececef;
-  --text-main: #14161c;
-  --text-muted: #5d616c;
-  --text-on-dark: #f2f3f5;
-  --text-muted-dark: #b3b7c0;
-  --border: #d9dbe1;
-  --border-dark: #313641;
-  --primary: #8d6a3a;
-  --primary-hover: #a17a45;
-  --danger: #7e3030;
-  --danger-hover: #662525;
-  --ok-bg: #ddece2;
-  --ok-text: #245d3a;
-  --low-bg: #f2dddd;
-  --low-text: #7e3030;
-  --shadow: 0 14px 30px rgba(6, 8, 13, 0.2);
+  --bg-main: #eeefe0;
+  --bg-surface: #f5f6eb;
+  --bg-card: #ffffff;
+  --bg-subtle: #fafaf4;
+  --text-main: #1f2926;
+  --text-muted: #596460;
+  --text-on-dark: #1f2926;
+  --text-muted-dark: #596460;
+  --border: #d9dfd6;
+  --border-dark: #d2d8cf;
+  --primary: #819a91;
+  --primary-hover: #6f8980;
+  --danger: #6f8780;
+  --danger-hover: #607870;
+  --ok-bg: #e7efe9;
+  --ok-text: #335349;
+  --low-bg: #ece8db;
+  --low-text: #5f695f;
+  --shadow: 0 12px 28px rgba(31, 41, 38, 0.1);
 }
 
 body {
   margin: 0;
   font-family: "Segoe UI", Arial, sans-serif;
-  background: radial-gradient(circle at 10% 0%, #242935 0%, var(--bg-main) 48%);
-  color: var(--text-on-dark);
+  background: var(--bg-main);
+  color: var(--text-main);
 }
 
 .container {
@@ -68,8 +68,8 @@ body {
   padding: 0.7rem 0.9rem;
   max-width: 680px;
   text-align: center;
-  background: #f4e5e7;
-  color: #7e3030;
+  background: #f3f1e6;
+  color: #596460;
   border-radius: 10px;
   border: 1px solid #f4cdd2;
 }
@@ -77,7 +77,7 @@ body {
 .refresh-btn {
   margin: 0 auto 1.25rem;
   display: block;
-  box-shadow: 0 10px 20px rgba(141, 106, 58, 0.28);
+  box-shadow: 0 8px 18px rgba(129, 154, 145, 0.28);
 }
 
 .stats-grid {
@@ -88,27 +88,27 @@ body {
 }
 
 .stat-card {
-  background: linear-gradient(155deg, #fcfcfd 0%, #f1f2f5 100%);
-  border: 1px solid #d5d8df;
+  background: linear-gradient(155deg, #ffffff 0%, #f9faf4 100%);
+  border: 1px solid #d9dfd6;
   border-radius: 16px;
   padding: 1rem;
   box-shadow: var(--shadow);
 }
 
 .stat-total {
-  border-top: 3px solid #8d6a3a;
+  border-top: 3px solid #819a91;
 }
 
 .stat-low {
-  border-top: 3px solid #7e3030;
+  border-top: 3px solid #738a82;
 }
 
 .stat-in {
-  border-top: 3px solid #496f55;
+  border-top: 3px solid #8ca49b;
 }
 
 .stat-out {
-  border-top: 3px solid #5a606f;
+  border-top: 3px solid #667d75;
 }
 
 .stat-label {
@@ -133,7 +133,7 @@ body {
 
 .card {
   background: var(--bg-card);
-  border: 1px solid #d3d6de;
+  border: 1px solid var(--border);
   border-radius: 16px;
   padding: 1rem;
   box-shadow: var(--shadow);
@@ -146,7 +146,7 @@ body {
 .card h2 {
   margin: 0 0 0.8rem;
   font-size: 1.1rem;
-  color: #1e2129;
+  color: var(--text-main);
 }
 
 .from-row {
@@ -178,7 +178,7 @@ body {
 .input,
 select {
   width: 100%;
-  border: 1px solid #cfd3dc;
+  border: 1px solid #d2d9d0;
   border-radius: 10px;
   padding: 0.62rem 0.75rem;
   font-size: 0.95rem;
@@ -189,8 +189,8 @@ select {
 
 .input:focus,
 select:focus {
-  border-color: #8d6a3a;
-  box-shadow: 0 0 0 3px rgba(141, 106, 58, 0.2);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(129, 154, 145, 0.22);
 }
 
 .btn {
@@ -212,7 +212,7 @@ select:focus {
 .btn-primary {
   background: var(--primary);
   color: #fff;
-  box-shadow: 0 8px 18px rgba(141, 106, 58, 0.3);
+  box-shadow: 0 8px 18px rgba(129, 154, 145, 0.3);
 }
 
 .btn-primary:hover {
@@ -222,7 +222,7 @@ select:focus {
 .btn-danger {
   background: var(--danger);
   color: #fff;
-  box-shadow: 0 8px 16px rgba(184, 58, 58, 0.2);
+  box-shadow: 0 8px 16px rgba(111, 135, 128, 0.22);
 }
 
 .btn-danger:hover {
@@ -250,8 +250,8 @@ select:focus {
 }
 
 .inventory-table thead th {
-  background: #e8e9ee;
-  color: #2e333f;
+  background: #f1f4ec;
+  color: #33433f;
   text-align: left;
   font-size: 0.88rem;
   font-weight: 700;
@@ -261,11 +261,11 @@ select:focus {
 .inventory-table th,
 .inventory-table td {
   padding: 0.8rem 0.75rem;
-  border-bottom: 1px solid #e0e3ea;
+  border-bottom: 1px solid #e2e7df;
 }
 
 .inventory-table tbody tr:hover {
-  background: #f1f3f8;
+  background: #f5f7f0;
 }
 
 .status-pill {
