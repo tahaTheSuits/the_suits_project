@@ -108,7 +108,7 @@ function App() {
 
   useEffect(() => {
     const lowStockItems = items.filter(
-      (item) => Number(item.quantity) < Number(item.minStock || 1),
+      (item) => Number(item.quantity) === 0,
     ).length;
 
     setStats((prev) => ({
@@ -440,12 +440,12 @@ function App() {
             <tbody>
               {[...filteredItems]
                 .sort((a, b) => {
-                  const aLow = a.quantity < 1;
-                  const bLow = b.quantity < 4;
-                  return aLow - bLow; // الأخضر فوق، الأحمر تحت
+                  const aLow = Number(a.quantity) === 0;
+                  const bLow = Number(b.quantity) === 0;
+                  return aLow - bLow;
                 })
                 .map((item) => {
-                  const isLowStock = item.quantity < 1;
+                  const isLowStock = Number(item.quantity) === 0;
 
                   return (
                     <tr key={item._id}>
