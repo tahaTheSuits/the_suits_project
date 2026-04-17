@@ -1,6 +1,6 @@
 .reports-container {
   margin-top: 1.75rem;
-  background: #ffffff;
+  background: #eeefe0;
   border: 1px solid #d9dfd6;
   border-radius: 16px;
   box-shadow: 0 12px 28px rgba(31, 41, 38, 0.1);
@@ -60,7 +60,7 @@
 }
 
 .export-section {
-  background: #f8f9f3;
+  background: #f4f5ea;
   border: 1px solid #d9dfd6;
   border-radius: 12px;
   padding: 0.75rem;
@@ -78,7 +78,7 @@
   border: none;
   border-radius: 8px;
   padding: 0.56rem 0.7rem;
-  background: #819a91;
+  background: #5f756d;
   color: #fff;
   font-size: 0.82rem;
   font-weight: 600;
@@ -86,7 +86,7 @@
 }
 
 .export-section button:hover {
-  background: #6f8980;
+  background: #51655e;
 }
 
 .reports-section-title {
@@ -98,7 +98,7 @@
   overflow-x: auto;
   border: 1px solid #d9dfd6;
   border-radius: 12px;
-  background: #fff;
+  background: #eeefe0;
 }
 
 .reports-table {
@@ -115,14 +115,14 @@
 }
 
 .reports-table th {
-  background: #f1f4ec;
+  background: #e8ebdc;
   color: #33433f;
   font-size: 0.84rem;
   letter-spacing: 0.2px;
 }
 
 .reports-table tbody tr:hover {
-  background: #f5f7f0;
+  background: #e7eadb;
 }
 
 .loading-state {

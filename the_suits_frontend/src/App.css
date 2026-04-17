@@ -1,18 +1,18 @@
 :root {
-  --bg-main: #eeefe0;
+  --bg-main: #819a91;
   --bg-surface: #f5f6eb;
-  --bg-card: #ffffff;
-  --bg-subtle: #fafaf4;
+  --bg-card: #eeefe0;
+  --bg-subtle: #f4f5ea;
   --text-main: #1f2926;
   --text-muted: #596460;
-  --text-on-dark: #1f2926;
-  --text-muted-dark: #596460;
+  --text-on-dark: #f5f6eb;
+  --text-muted-dark: #e4e8dc;
   --border: #d9dfd6;
   --border-dark: #d2d8cf;
-  --primary: #819a91;
-  --primary-hover: #6f8980;
-  --danger: #6f8780;
-  --danger-hover: #607870;
+  --primary: #5f756d;
+  --primary-hover: #51655e;
+  --danger: #5f756d;
+  --danger-hover: #51655e;
   --ok-bg: #e7efe9;
   --ok-text: #335349;
   --low-bg: #ece8db;
@@ -88,7 +88,7 @@ body {
 }
 
 .stat-card {
-  background: linear-gradient(155deg, #ffffff 0%, #f9faf4 100%);
+  background: #eeefe0;
   border: 1px solid #d9dfd6;
   border-radius: 16px;
   padding: 1rem;
@@ -182,7 +182,7 @@ select {
   border-radius: 10px;
   padding: 0.62rem 0.75rem;
   font-size: 0.95rem;
-  background: #ffffff;
+  background: #f9faf4;
   color: var(--text-main);
   outline: none;
 }
@@ -250,7 +250,7 @@ select:focus {
 }
 
 .inventory-table thead th {
-  background: #f1f4ec;
+  background: #e8ebdc;
   color: #33433f;
   text-align: left;
   font-size: 0.88rem;
@@ -265,7 +265,7 @@ select:focus {
 }
 
 .inventory-table tbody tr:hover {
-  background: #f5f7f0;
+  background: #e7eadb;
 }
 
 .status-pill {
