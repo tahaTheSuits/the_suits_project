@@ -3,9 +3,8 @@ import { useEffect, useState } from "react";
 import axios from "axios";
 import { saveAs } from "file-saver";
 import "./reports.css";
-import { FaFileExcel, FaFilePdf } from "react-icons/fa";
 
-export default function Reports() {
+export default function Reports({ refreshKey }) {
   // ====== States ======
   const [dailyStockOut, setDailyStockOut] = useState([]);
   const [weeklyStockOut, setWeeklyStockOut] = useState([]);
@@ -53,7 +52,7 @@ export default function Reports() {
   useEffect(() => {
     fetchReports();
     //// eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [refreshKey]);
 
   const formatDate = (date) => new Date(date).toLocaleDateString("en-GB");
 
@@ -84,13 +83,13 @@ export default function Reports() {
 
   return (
     <div className="reports-container">
-      <h1 className="reports-title">📊 Reports Dashboard</h1>
+      <h1 className="reports-title">Reports Dashboard</h1>
       {error && <p className="reports-error">{error}</p>}
 
       {/* Date Filters */}
       <div className="reports-filters">
         <label>
-          From:{" "}
+          From
           <input
             type="date"
             value={fromDate}
@@ -99,7 +98,7 @@ export default function Reports() {
           />
         </label>
         <label>
-          To:{" "}
+          To
           <input
             type="date"
             value={toDate}
@@ -111,37 +110,21 @@ export default function Reports() {
 
       {/* Export Buttons */}
       <div className="export-container">
-        <div className="export-wrapper">
-          <button className="export-btn">Export ▼</button>
-
-          <div className="export-menu">
-            <div className="export-section">
-              <span>Stock In:</span>
-              <button onClick={() => exportPDF("stock-in")}>PDF</button>
-              <button onClick={() => exportExcel("stock-in")}>Excel</button>
-            </div>
-            <div className="export-section">
-              <span>Stock Out:</span>
-              <button onClick={() => exportPDF("stock-out")}>PDF</button>
-              <button onClick={() => exportExcel("stock-out")}>Excel</button>
-            </div>
-          </div>
+        <div className="export-section">
+          <span>Stock In</span>
+          <button onClick={() => exportPDF("stock-in")}>Export PDF</button>
+          <button onClick={() => exportExcel("stock-in")}>Export Excel</button>
+        </div>
+        <div className="export-section">
+          <span>Stock Out</span>
+          <button onClick={() => exportPDF("stock-out")}>Export PDF</button>
+          <button onClick={() => exportExcel("stock-out")}>Export Excel</button>
         </div>
       </div>
-      {/* Tables */}
-      <h2 className="reports-section-title">Daily Stock Out:</h2>
+      <h2 className="reports-section-title">Daily Stock Out</h2>
       <div className="table-wrapper">
         {loading ? (
-          <p
-            style={{
-              textAlign: "center",
-              padding: "20px",
-              fontSize: "30px",
-              color: "red",
-            }}
-          >
-            Loading inventory...
-          </p>
+          <p className="loading-state">Loading reports...</p>
         ) : (
           <table className="reports-table">
             <thead>
@@ -157,10 +140,10 @@ export default function Reports() {
             <tbody>
               {dailyStockOut.map((item) => (
                 <tr key={item._id}>
-                  <td>{formatDate(item.date)}</td>
-                  <td>{item.productName}</td>
-                  <td>{item.quantity}</td>
-                  <td>{item.unit}</td>
+                  <td data-label="Date">{formatDate(item.date)}</td>
+                  <td data-label="Product">{item.productName}</td>
+                  <td data-label="Quantity">{item.quantity}</td>
+                  <td data-label="Unit">{item.unit}</td>
                   {/* <td>{item.floor || "-"}</td>
                   <td>{item.usedBy || "-"}</td> */}
                 </tr>
@@ -170,7 +153,7 @@ export default function Reports() {
         )}
       </div>
 
-      <h2 className="reports-section-title">Weekly Stock Out:</h2>
+      <h2 className="reports-section-title">Weekly Stock Out</h2>
       <div className="table-wrapper">
         <table className="reports-table">
           <thead>
@@ -186,10 +169,10 @@ export default function Reports() {
           <tbody>
             {weeklyStockOut.map((item) => (
               <tr key={item._id}>
-                <td>{formatDate(item.date)}</td>
-                <td>{item.productName}</td>
-                <td>{item.quantity}</td>
-                <td>{item.unit}</td>
+                <td data-label="Date">{formatDate(item.date)}</td>
+                <td data-label="Product">{item.productName}</td>
+                <td data-label="Quantity">{item.quantity}</td>
+                <td data-label="Unit">{item.unit}</td>
                 {/* <td>{item.floor || "-"}</td>
                 <td>{item.usedBy || "-"}</td> */}
               </tr>
@@ -198,7 +181,7 @@ export default function Reports() {
         </table>
       </div>
 
-      <h2 className="reports-section-title">Daily Stock In:</h2>
+      <h2 className="reports-section-title">Daily Stock In</h2>
       <div className="table-wrapper">
         <table className="reports-table">
           <thead>
@@ -213,10 +196,10 @@ export default function Reports() {
           <tbody>
             {dailyStockIn.map((item) => (
               <tr key={item._id}>
-                <td>{formatDate(item.date)}</td>
-                <td>{item.productName}</td>
-                <td>{item.quantity}</td>
-                <td>{item.unit}</td>
+                <td data-label="Date">{formatDate(item.date)}</td>
+                <td data-label="Product">{item.productName}</td>
+                <td data-label="Quantity">{item.quantity}</td>
+                <td data-label="Unit">{item.unit}</td>
                 {/* <td>{item.source || "-"}</td> */}
               </tr>
             ))}
@@ -224,7 +207,7 @@ export default function Reports() {
         </table>
       </div>
 
-      <h2 className="reports-section-title">Weekly Stock In:</h2>
+      <h2 className="reports-section-title">Weekly Stock In</h2>
       <div className="table-wrapper">
         <table className="reports-table">
           <thead>
@@ -239,10 +222,10 @@ export default function Reports() {
           <tbody>
             {weeklyStockIn.map((item) => (
               <tr key={item._id}>
-                <td>{formatDate(item.date)}</td>
-                <td>{item.productName}</td>
-                <td>{item.quantity}</td>
-                <td>{item.unit}</td>
+                <td data-label="Date">{formatDate(item.date)}</td>
+                <td data-label="Product">{item.productName}</td>
+                <td data-label="Quantity">{item.quantity}</td>
+                <td data-label="Unit">{item.unit}</td>
                 {/* <td>{item.source || "-"}</td> */}
               </tr>
             ))}

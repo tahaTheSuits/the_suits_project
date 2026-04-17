@@ -1,531 +1,291 @@
+:root {
+  --bg-main: #f4f6fb;
+  --bg-card: #ffffff;
+  --bg-subtle: #f8fafc;
+  --text-main: #1b1f2a;
+  --text-muted: #5f6b84;
+  --border: #e5e9f2;
+  --primary: #4f3514;
+  --primary-hover: #6d4a20;
+  --danger: #b83a3a;
+  --danger-hover: #9b2d2d;
+  --ok-bg: #e6f8ec;
+  --ok-text: #137d3d;
+  --low-bg: #fceaea;
+  --low-text: #b3261e;
+  --shadow: 0 10px 24px rgba(13, 28, 53, 0.08);
+}
+
 body {
-  width: 100%;
-  min-width: 0;
-  padding: 0;
-  overflow-x: hidden;
   margin: 0;
-  font-family: Arial, sans-serif;
-  background-color: #f8f6ba;
-  
+  font-family: "Segoe UI", Arial, sans-serif;
+  background: var(--bg-main);
+  color: var(--text-main);
 }
 
 .container {
-  padding: 20px;
-  max-width: 1200px;
+  width: min(1200px, 100%);
   margin: 0 auto;
-  box-sizing: border-box;
-  width: 100%;
-  overflow-x: hidden;
-  background-color: #f8f6ba;
+  padding: 1rem;
 }
 
-
-h2 {
-  color: #333;
-  margin-left: 5px;
-  font-size: 30px;
-  margin-top: -2px;
-
-
-}
-
-
-.app-header{
-  /* position: relative; */
-  /* display: flex; */
-  /* justify-items: center; */
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  margin-bottom: 50px;
-  
-}
-
-.app-header .logo {
-  /* position: relative; */
-  /* left: 50px; */
-  width: 230px;
-  /* max-width: 40vw; */
-
-  
-}
-
-.title{
-  /* position: relative; */
-  /* left: 400px; */
-  text-align: center;
-  font-size: 40px;
-  color: #333;
-  /* margin-top: 100px; */
-  
-}
-
-
-.error-msg{
-  color: red;
-  margin: 10px 0;
-  text-align: center;
-}
-
-
-/* inventory table  */
-
-
-.inventory-table-wrapper {
-  max-height: 400px;
-  overflow-y: auto;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  /* box-shadow: inset 0 4px 10px rgb(92, 92, 92); */
-  /* 0 4px 10px rgba(92, 92, 92); */
-  /* border-radius: 5px; */
-  /* background-color: #fff; */
-}
-
-.inventory-title{
-  margin: 80px 0 20px 40px;
-  font-size: 35px;
-}
-
-
-.card-container {
+.app-header {
   display: flex;
-  flex-wrap: wrap;
   justify-content: center;
-  /* display: grid; */
-  /* grid-template-columns: repeat(auto-fit, minmax(300px,1fr)); */
-  gap: 20px;
-  margin-left: auto;
-  margin-right: auto;
-  /* max-width: 1200px; */
+  align-items: center;
+  padding: 0.5rem 0 0.25rem;
 }
 
-
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+.logo {
+  width: clamp(110px, 12vw, 150px);
+  height: auto;
 }
 
-::-webkit-scrollbar-track {
-  background-color: #f1f1f1;
+.page-hero {
+  text-align: center;
+  margin: 0.5rem 0 1.25rem;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(1.5rem, 2.6vw, 2.2rem);
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.subtitle {
+  margin: 0.4rem 0 0;
+  color: var(--text-muted);
+  font-size: clamp(0.95rem, 1.5vw, 1.05rem);
+}
+
+.error-msg {
+  margin: 0.5rem auto 1rem;
+  padding: 0.7rem 0.9rem;
+  max-width: 680px;
+  text-align: center;
+  background: #fde7e9;
+  color: #ac1e2d;
   border-radius: 10px;
+  border: 1px solid #f4cdd2;
 }
 
-
-::-webkit-scrollbar-thumb {
-  background-color: #75441c;
-  border-radius: 10px;
+.refresh-btn {
+  margin: 0 auto 1.25rem;
+  display: block;
 }
 
-
-
-::-webkit-scrollbar-thumb:hover {
-  background-color: #552f0f;
+.cards-container {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  align-items: start;
 }
 
 .card {
-  flex: 1 1 300px;
-  max-width: 750px;
-  min-width: 250px;
-  padding: 20px;
-  border-radius: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 1rem;
+  box-shadow: var(--shadow);
+}
+
+.card h2 {
+  margin: 0 0 0.8rem;
+  font-size: 1.1rem;
+}
+
+.from-row {
   display: grid;
-  box-shadow: 0 8px 12px rgb(92, 92, 92);
-  /* margin: 20px 50px ; */
-  background-color: #fff;
-  /* width: 95%; */
-  margin-left: 40px;
+  gap: 0.65rem;
 }
 
-.inventory-table {
-  width: 90%;
-  margin: 40px auto;
-  border-collapse: collapse;
-  background: #f8f6ba;
-  /* box-shadow: 0 8px 12px rgba(0, 0, 0, 0.15); */
-  /* border-radius: 10px; */
-  /* overflow: hidden; */
-  /* margin-left: 2.6rem; */
-  min-width: 600px;
-  box-shadow:  0 0 15px rgb(92, 92, 92);
-  /* padding-left: -50px; */
+.input,
+select {
+  width: 100%;
+  border: 1px solid #d9deea;
+  border-radius: 10px;
+  padding: 0.62rem 0.75rem;
+  font-size: 0.95rem;
+  background: #fff;
+  color: var(--text-main);
+  outline: none;
 }
 
-/* Header */
-.inventory-table thead {
-  background: #75441c;
-  color: #fff;
-}
-
-.inventory-table th {
-  padding: 10px;
-  text-align: center;
-  font-size: 18px;
-  padding-right: 4rem;
-}
-
-/* Rows */
-.inventory-table td {
-  padding: 5px ;
-  text-align: center;
-  font-size: 18px;
-  border-bottom: 1px solid #ddd;
-  padding-right: 4rem;
-  color: #333;
-}
-
-.inventory-table td[data-label="product"] {
-  /* display: inline-block; */
-  max-width: 200px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-size: clamp(12px, 3vw, 16px); /* يقل حجم الخط تلقائياً حسب حجم الشاشة */
-}
-
-
-/* Zebra style */
-.inventory-table tbody tr:nth-child(even) {
-  background-color: #f7f7f7;
-}
-
-/* Hover */
-.inventory-table tbody tr:hover {
-  background-color: #ffe6cc;
-}
-
-/* Status circle */
-.status-dot {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.status-dot.green {
-  background-color: #00c853;
-}
-
-.status-dot.red {
-  background-color: #d50000;
-}
-
-/* Delete button */
-.delete-btn {
-  background-color: #d32f2f;
-  color: #fff;
-  border: none;
-  padding: 4px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 12px;
-  transition: 0.25s ease;
-}
-
-.delete-btn:hover {
-  background-color: #b71c1c;
-}
-.delete-btn:active {
-  transform: translateY(0);
-}
-
-
-/* ===== Buttons ===== */
-
-button,
-button:focus,
-button:focus-visible,
-button:active{
-  outline: none !important;
-  box-shadow:none !important;
-  border: none;
-}
-
-
-input,
-input:focus,
-input:focus-visible,
-input:active{
-  outline: none !important;
-  box-shadow:none !important;
-  border: none;
+.input:focus,
+select:focus {
+  border-color: #8290ab;
+  box-shadow: 0 0 0 3px rgba(130, 144, 171, 0.18);
 }
 
 .btn {
-  outline: none;
-  box-shadow: none;
-  padding: 10px 18px;
-  border-radius: 10px;
   border: none;
+  border-radius: 10px;
+  padding: 0.65rem 1rem;
+  font-size: 0.92rem;
+  font-weight: 600;
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.25s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 5px;
+  transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-/* نفس لون زر Refresh */
+.btn:hover {
+  transform: translateY(-1px);
+}
+
 .btn-primary {
-  background-color: #552f0f;
+  background: var(--primary);
   color: #fff;
-  outline: none;
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(85, 47, 15, 0.35);
+  background: var(--primary-hover);
 }
 
-/* زر الحذف */
 .btn-danger {
-  background-color: #b30000;
+  background: var(--danger);
   color: #fff;
 }
 
 .btn-danger:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(179, 0, 0, 0.35);
+  background: var(--danger-hover);
 }
 
-/* Refresh مكانه مرتب */
-.refresh-btn {
-  margin: 6% 0 2% 6%;
-  width: 20%;
-  min-width: 100px;
-  max-width: 150px;
+.inventory-title {
+  margin: 1.8rem 0 0.8rem;
+  font-size: 1.35rem;
 }
 
-/* ===== Cards ===== */
-.card {
-  background: #f8f8f8;
+.inventory-table-wrapper {
+  overflow-x: auto;
   border-radius: 14px;
-  padding: 20px;
-  margin-bottom: 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  box-shadow: var(--shadow);
 }
 
-/* ===== Inputs ===== */
-.input {
-  
-  width: 90%;
-  padding: 10px;
-  border-radius: 8px;
-  /* border: 1px solid #ccc; */
-  margin: 6px 0;
-  outline: none;
+.inventory-table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
 }
 
-.input:focus {
-  border-color: #552f0f;
-  box-shadow: 0 0 0 2px rgba(85, 47, 15, 0.2);
+.inventory-table thead th {
+  background: #eef2f8;
+  color: #364156;
+  text-align: left;
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
 }
 
-select{
-  outline: none !important;
-  box-shadow:none !important;
+.inventory-table th,
+.inventory-table td {
+  padding: 0.8rem 0.75rem;
+  border-bottom: 1px solid #ebeff6;
+}
+
+.inventory-table tbody tr:hover {
+  background: #fafcff;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0.24rem 0.55rem;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.status-pill.ok {
+  background: var(--ok-bg);
+  color: var(--ok-text);
+}
+
+.status-pill.low {
+  background: var(--low-bg);
+  color: var(--low-text);
+}
+
+.delete-btn {
   border: none;
-  width: 92.5%;
-  padding: 10px;
-  margin: 6px 0;
   border-radius: 8px;
-  box-sizing: border-box;
-
+  padding: 0.45rem 0.7rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #fff;
+  background: var(--danger);
+  cursor: pointer;
 }
 
+.delete-btn:hover {
+  background: var(--danger-hover);
+}
 
-/* @media (max-width: 992px) {
-  .refresh-btn {
-    width: 30%;
-    margin-left: 5%;
+.loading-state {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 1.2rem;
+}
+
+@media (max-width: 992px) {
+  .cards-container {
+    grid-template-columns: 1fr 1fr;
   }
-
-  .card{
-    width: 90%;
-    max-width: 450px;
-
-  }
-
-
-  .inventory-table {
-    width: 90%;
-  }
-} */
-
-
-
-
+}
 
 @media (max-width: 768px) {
-  body {
-    overflow-x: hidden;
-    width: 100%;
-    min-width: 0;
-    padding: 0;
-    margin: 0;
-    background-color:#f8f6ba;
-}
-
-
-  .input .btn {
-    width: 100%;
+  .container {
+    padding: 0.8rem;
   }
 
-  .app-header {
+  .cards-container {
     grid-template-columns: 1fr;
-    text-align: center;
-    gap: 10px;
+    gap: 0.85rem;
   }
 
-  .logo {
-    margin: 0 auto;
-  }
-
-  .title {
-    font-size: 28px;
-  }
-
-  .card {
-    width: 95%;
-    max-width: none;
-    margin-right: 0;
-    margin-left: auto;
-  }
-
-
-  .card .from-row {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-
-
-  .card .from-row .input,
-  .card .from-row select {
-    flex: 1;
-  }
-
+  .btn,
   .refresh-btn {
-    margin: 20px 0;
-    width: 100%;
-    margin-left: 1%;
+    width: 100% !important;
   }
 
-  .btn {
-    width: 100%;
-    justify-content: center;
+  .inventory-table {
+    min-width: 100%;
   }
 
-  .input,
-  select {
-    width: 100%;
+  .inventory-table thead {
+    display: none;
   }
 
-  .inventory-title {
-    margin: 40px 0 10px 0;
-    font-size: 24px;
-    text-align: center;
-  }
-
-  /* ===== TABLE FIX ===== */
   .inventory-table,
-  .inventory-table-wrapper{
-    /* width: 50%; */
-    margin:  20px auto;
-    font-size: 14px;
-    width: 80%;
-    max-width: 1200px;
-    overflow-x: hidden;
-    /* max-width: 90%; */
-    /* min-width: 50% ; */
-    
-  }
-
-  .inventory-table{
-    width: 100%;
-    border-collapse: collapse;
-    min-width: 0 ;
-    table-layout: fixed;
-    /* overflow-x: hidden; */
-    font-size: 14px;
-  }
-
-  .inventory-table th,
+  .inventory-table tbody,
+  .inventory-table tr,
   .inventory-table td {
-    padding: 6px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
+    display: block;
+    width: 100%;
+  }
 
+  .inventory-table tr {
+    border-bottom: 1px solid #ebeff6;
+    padding: 0.65rem 0.65rem 0.45rem;
+  }
 
-.inventory-table td[data-label="product"] {
-  max-width: 100px;
-  font-size: clamp(12px, 10vw, 14px);
-}
+  .inventory-table td {
+    border: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.7rem;
+    padding: 0.35rem 0;
+    font-size: 0.9rem;
+  }
 
-
-
-
-
-/* .inventory-table,
-.inventory-table thead,
-.inventory-table tbody,
-.inventory-table th,
-.inventory-table td,
-.inventory-table tr {
-  display: block;
-} */
-
-
-/* .inventory-table thead tr {
-  display: none;
-} */
-
-
-/* .inventory-table tbody tr {
-  margin-bottom: 20px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  padding: 10px;
-  background-color: #fff;
-} */
-
-
-/* .inventory-table td {
-  text-align: right;
-  padding-left: 40%;
-  position: relative;
-} */
-
-
-/* .inventory-table td::before {
-  content: attr(data-label);
-  position: absolute;
-  left: 15px;
-  font-weight: bold;
-  text-transform: uppercase;
-} */
-
-
-
-
-
-
-.card-container{
-  flex-direction: column;
-  gap: 15px;
-  
-}
-
-}
-
-
-@media (max-width: 480px) {
-  .card {
-    padding: 15px;
-    width: 95%;
+  .inventory-table td::before {
+    content: attr(data-label);
+    text-transform: capitalize;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 0.82rem;
   }
 }

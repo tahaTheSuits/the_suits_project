@@ -6,8 +6,6 @@ import {
   setDailyReport,
 } from "./features/inventory/inventorySlice.js";
 import axios from "axios";
-import { FaBox, FaHome } from "react-icons/fa";
-//import Dashboard from "./pages/Dashboard.jsx";
 import Reports from "./components/reports.jsx";
 import logo from "./assets/logo2.png";
 import "./App.css";
@@ -175,21 +173,21 @@ function App() {
 
   return (
     <div className="container">
-      {/* Header */}
       <header className="app-header">
-        <img className="logo" src={logo} alt="Logo" />
-        <h1 className="title">
-          <FaHome /> The Suites Warehouses
-        </h1>
+        <img className="logo" src={logo} alt="The Suites logo" />
       </header>
 
       {message && <p className="error-msg">{message}</p>}
 
+      <section className="page-hero">
+        <h1 className="title">The Suites Warehouse Dashboard</h1>
+        <p className="subtitle">Inventory control for housekeeping operations</p>
+      </section>
+
       <button onClick={refreshAll} className="btn btn-primary refresh-btn">
-        Refresh Data 🔄
+        Refresh Data
       </button>
 
-      {/* Add Product */}
       <div className="cards-container">
         <div className="card">
           <h2>Add New Product</h2>
@@ -354,20 +352,10 @@ function App() {
           </div>
         </div>
       </div>
-      {/* Inventory Grid */}
-      <h2 className="inventory-title">Current Inventory:</h2>
+      <h2 className="inventory-title">Current Inventory</h2>
       <div className="inventory-table-wrapper">
         {loading ? (
-          <p
-            style={{
-              textAlign: "center",
-              padding: "20px",
-              fontSize: "30px",
-              color: "red",
-            }}
-          >
-            Loading inventory...
-          </p>
+          <p className="loading-state">Loading inventory...</p>
         ) : (
           <table className="inventory-table">
             <thead>
@@ -397,11 +385,9 @@ function App() {
                       <td data-label="unit">{item.unit}</td>
 
                       <td data-label="status">
-                        <span
-                          className={`status-dot ${
-                            isLowStock ? "red" : "green"
-                          }`}
-                        />
+                        <span className={`status-pill ${isLowStock ? "low" : "ok"}`}>
+                          {isLowStock ? "Low Stock" : "In Stock"}
+                        </span>
                       </td>
 
                       <td data-label="action">
@@ -419,10 +405,6 @@ function App() {
           </table>
         )}
       </div>
-      {/* Dashboard يظهر مرة واحدة فقط تحت */}
-      {/* <Dashboard refreshKey={reportsRefreshKey} /> */}
-
-      {/* Reports component */}
       <Reports refreshKey={reportsRefreshKey} />
     </div>
   );
