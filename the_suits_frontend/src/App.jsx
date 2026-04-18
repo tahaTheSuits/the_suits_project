@@ -215,23 +215,6 @@ function App() {
     }
   };
 
-  const handleClearAllData = async () => {
-    const isConfirmed = window.confirm(
-      "This will permanently delete ALL inventory, stock in/out records, and report data. This action cannot be undone. Continue?",
-    );
-
-    if (!isConfirmed) return;
-
-    try {
-      await api.delete("/api/delete/all/data");
-      await refreshAll();
-      setMessage("All warehouse data has been cleared successfully.");
-    } catch (err) {
-      console.error(err);
-      setMessage("Failed to clear all data.");
-    }
-  };
-
   const filteredItems = items.filter((item) =>
     item.product.toLowerCase().includes(searchTerm.toLowerCase()),
   );
@@ -446,16 +429,6 @@ function App() {
         </div>
       </div>
 
-      <section className="danger-zone">
-        <h2>Admin: Dangerous Action</h2>
-        <p>
-          Permanently remove all inventory data, stock-in and stock-out records.
-          Use this only when you want to reset the system completely.
-        </p>
-        <button onClick={handleClearAllData} className="btn btn-clear-all">
-          Clear All Data
-        </button>
-      </section>
       <h2 className="inventory-title">Current Inventory</h2>
       <div className="inventory-table-wrapper">
         {inventoryLoading ? (

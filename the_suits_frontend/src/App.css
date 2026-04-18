@@ -309,37 +309,6 @@ select:focus {
   padding: 1.2rem;
 }
 
-.danger-zone {
-  margin-top: 1.25rem;
-  background: #fdf2f2;
-  border: 1px solid #f3c5c5;
-  border-left: 4px solid #d64545;
-  border-radius: 14px;
-  padding: 1rem;
-  box-shadow: var(--shadow);
-}
-
-.danger-zone h2 {
-  margin: 0 0 0.5rem;
-  font-size: 1.05rem;
-  color: #8f2424;
-}
-
-.danger-zone p {
-  margin: 0 0 0.75rem;
-  color: #7a3f3f;
-  font-size: 0.92rem;
-}
-
-.btn-clear-all {
-  background: #d64545;
-  color: #fff;
-}
-
-.btn-clear-all:hover {
-  background: #b83838;
-}
-
 @media (max-width: 992px) {
   .stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
