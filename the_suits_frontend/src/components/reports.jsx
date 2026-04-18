@@ -1,10 +1,17 @@
 // src/pages/Reports.jsx
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
 import { saveAs } from "file-saver";
 import "./reports.css";
 
-export default function Reports({ refreshKey }) {
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "https://the-suits-project.onrender.com";
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 20000,
+});
+
+export default function Reports({ refreshKey, enabled }) {
   // ====== States ======
   const [dailyStockOut, setDailyStockOut] = useState([]);
   const [weeklyStockOut, setWeeklyStockOut] = useState([]);
@@ -14,27 +21,24 @@ export default function Reports({ refreshKey }) {
 
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   // ====== Fetch Reports ======
-  const fetchReports = async () => {
+  const fetchReports = useCallback(async () => {
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError("");
       const [dailyOutRes, weeklyOutRes, dailyInRes, weeklyInRes] =
         await Promise.all([
-          axios.get(
-            "https://the-suits-project.onrender.com/api/reports/stock-out/daily",
-          ),
-          axios.get(
-            "https://the-suits-project.onrender.com/api/reports/stock-out/weekly",
-          ),
-          axios.get(
-            "https://the-suits-project.onrender.com/api/reports/stock-in/daily",
-          ),
-          axios.get(
-            "https://the-suits-project.onrender.com/api/reports/stock-in/weekly",
-          ),
+          api.get("/api/reports/stock-out/daily"),
+          api.get("/api/reports/stock-out/weekly"),
+          api.get("/api/reports/stock-in/daily"),
+          api.get("/api/reports/stock-in/weekly"),
         ]);
 
       setDailyStockOut(dailyOutRes.data || []);
@@ -47,12 +51,11 @@ export default function Reports({ refreshKey }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [enabled]);
 
   useEffect(() => {
     fetchReports();
-    //// eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshKey]);
+  }, [fetchReports, refreshKey]);
 
   const formatDate = (date) => new Date(date).toLocaleDateString("en-GB");
 
@@ -60,8 +63,8 @@ export default function Reports({ refreshKey }) {
   const exportExcel = async (type, period) => {
     try {
       setError("");
-      const url = `https://the-suits-project.onrender.com/api/export/${type}/excel?from=${fromDate}&to=${toDate}`;
-      const res = await axios.get(url, { responseType: "blob" });
+      const url = `/api/export/${type}/excel?from=${fromDate}&to=${toDate}`;
+      const res = await api.get(url, { responseType: "blob" });
       saveAs(res.data, `${type}-${period}-report.xlsx`);
     } catch (err) {
       console.error(err);
@@ -72,8 +75,8 @@ export default function Reports({ refreshKey }) {
   const exportPDF = async (type, period) => {
     try {
       setError("");
-      const url = `https://the-suits-project.onrender.com/api/export/${type}/pdf?from=${fromDate}&to=${toDate}`;
-      const res = await axios.get(url, { responseType: "blob" });
+      const url = `/api/export/${type}/pdf?from=${fromDate}&to=${toDate}`;
+      const res = await api.get(url, { responseType: "blob" });
       saveAs(res.data, `${type}-${period}-report.pdf`);
     } catch (err) {
       console.error(err);

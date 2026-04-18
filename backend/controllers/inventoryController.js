@@ -6,29 +6,36 @@ const StockOut = require("../models/stockOutModel");
 // Get Inventory
 exports.getInventory = async (req, res) => {
   try {
-    const products = await Product.find();
-    const inventory = [];
-    for (const product of products) {
-      const stockInAgg = await StockIn.aggregate([
-        { $match: { product: product._id } },
-        { $group: { _id: "$product", totalIn: { $sum: "$quantity" } } }
-      ]);
-      const stockOutAgg = await StockOut.aggregate([
-        { $match: { product: product._id } },
-        { $group: { _id: "$product", totalOut: { $sum: "$quantity" } } }
-      ]);
+    const [products, stockInTotals, stockOutTotals] = await Promise.all([
+      Product.find(),
+      StockIn.aggregate([
+        { $group: { _id: "$product", totalIn: { $sum: "$quantity" } } },
+      ]),
+      StockOut.aggregate([
+        { $group: { _id: "$product", totalOut: { $sum: "$quantity" } } },
+      ]),
+    ]);
 
-      const totalIn = stockInAgg[0]?.totalIn || 0;
-      const totalOut = stockOutAgg[0]?.totalOut || 0;
+    const stockInMap = new Map(
+      stockInTotals.map((entry) => [String(entry._id), Number(entry.totalIn) || 0]),
+    );
+    const stockOutMap = new Map(
+      stockOutTotals.map((entry) => [String(entry._id), Number(entry.totalOut) || 0]),
+    );
 
-      inventory.push({
+    const inventory = products.map((product) => {
+      const productId = String(product._id);
+      const totalIn = stockInMap.get(productId) || 0;
+      const totalOut = stockOutMap.get(productId) || 0;
+
+      return {
         _id: product._id,
         product: product.name,
         quantity: totalIn - totalOut,
         unit: product.unit,
-        minStock: product.minStock
-      });
-    }
+        minStock: product.minStock,
+      };
+    });
 
     res.json(inventory);
   } catch (err) {

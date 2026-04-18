@@ -1,14 +1,18 @@
 // src/App.jsx
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import {
-  setInventory,
-  setDailyReport,
-} from "./features/inventory/inventorySlice.js";
+import { setInventory } from "./features/inventory/inventorySlice.js";
 import axios from "axios";
 import Reports from "./components/reports.jsx";
 import logo from "./assets/logo2.png";
 import "./App.css";
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "https://the-suits-project.onrender.com";
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 20000,
+});
 
 function App() {
   const dispatch = useDispatch();
@@ -23,7 +27,9 @@ function App() {
   });
 
   const [stockOutUnit, setStockOutUnit] = useState("pcs");
-  const [loading, setLoading] = useState(true);
+  const [inventoryLoading, setInventoryLoading] = useState(true);
+  const [reportsReady, setReportsReady] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Stock in/out fields
   const [stockInProduct, setStockInProduct] = useState("");
@@ -46,38 +52,22 @@ function App() {
   // Fetch Inventory
   const fetchInventory = async () => {
     try {
-      setLoading(true);
-      const res = await axios.get(
-        "https://the-suits-project.onrender.com/api/inventory",
-      );
+      setInventoryLoading(true);
+      const res = await api.get("/api/inventory");
       dispatch(setInventory(res.data || []));
-      setMessage("");
     } catch (err) {
       console.error(err);
       setMessage("Error fetching inventory");
     } finally {
-      setLoading(false);
-    }
-  };
-
-  // Fetch Daily Report
-  const fetchDailyReport = async () => {
-    try {
-      const res = await axios.get(
-        "https://the-suits-project.onrender.com/api/daily-reports",
-      );
-      dispatch(setDailyReport(res.data || []));
-    } catch (err) {
-      console.error(err);
-      setMessage("Error fetching daily report");
+      setInventoryLoading(false);
     }
   };
 
   const fetchDashboardStats = async () => {
     try {
       const [stockInDailyRes, stockOutDailyRes] = await Promise.all([
-        axios.get("https://the-suits-project.onrender.com/api/reports/stock-in/daily"),
-        axios.get("https://the-suits-project.onrender.com/api/reports/stock-out/daily"),
+        api.get("/api/reports/stock-in/daily"),
+        api.get("/api/reports/stock-out/daily"),
       ]);
 
       const stockInToday = (stockInDailyRes.data || []).reduce(
@@ -99,11 +89,21 @@ function App() {
     }
   };
 
-  const refreshAll = async () => {
-    await fetchInventory();
-    await fetchDailyReport();
-    await fetchDashboardStats();
-    setReportsRefreshKey((prev) => prev + 1);
+  const refreshAll = async ({ prioritizeInventory = false } = {}) => {
+    setIsRefreshing(true);
+    try {
+      await fetchInventory();
+
+      if (prioritizeInventory) {
+        setReportsReady(true);
+      }
+
+      await fetchDashboardStats();
+      setReportsRefreshKey((prev) => prev + 1);
+      setMessage("");
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   useEffect(() => {
@@ -128,7 +128,12 @@ function App() {
 
   useEffect(() => {
     document.title = "The Suites Warehouse";
-    refreshAll();
+
+    const bootstrap = async () => {
+      await refreshAll({ prioritizeInventory: true });
+    };
+
+    bootstrap();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -136,7 +141,7 @@ function App() {
   const handleAddNewProduct = async () => {
     if (!newProductName.trim()) return setMessage("Enter product name");
     try {
-      await axios.post("https://the-suits-project.onrender.com/api/products", {
+      await api.post("/api/products", {
         name: newProductName,
         minStock: Number(newProductMinStock) || 5,
         initialQty: Number(newProductQty) || 0,
@@ -145,7 +150,7 @@ function App() {
       setNewProductName("");
       setNewProductMinStock("");
       setNewProductQty("");
-      refreshAll();
+      await refreshAll();
       setMessage("Product added successfully!");
     } catch (err) {
       console.error(err);
@@ -158,7 +163,7 @@ function App() {
     if (!stockInProduct || !stockInQty)
       return setMessage("Select product & quantity");
     try {
-      await axios.post("https://the-suits-project.onrender.com/api/stock-in", {
+      await api.post("/api/stock-in", {
         product: stockInProduct,
         quantity: Number(stockInQty),
         source: "Main Hotel",
@@ -166,7 +171,7 @@ function App() {
       });
       setStockInProduct("");
       setStockInQty("");
-      refreshAll();
+      await refreshAll();
       setMessage("Stock In successful!");
     } catch (err) {
       console.error(err);
@@ -180,7 +185,7 @@ function App() {
       // || !usedBy || !floor
       return setMessage("Fill all Stock Out fields");
     try {
-      await axios.post("https://the-suits-project.onrender.com/api/stock-out", {
+      await api.post("/api/stock-out", {
         productId: stockOutProduct,
         quantity: Number(stockOutQty),
         unit: stockOutUnit,
@@ -190,7 +195,7 @@ function App() {
       setStockOutUnit("pcs");
       // setUsedBy("");
       // setFloor("");
-      refreshAll();
+      await refreshAll();
       setMessage("Stock Out successful!");
     } catch (err) {
       console.error(err);
@@ -201,14 +206,29 @@ function App() {
   const handleDeleteProduct = async (id) => {
     if (!id) return setMessage("No product ID");
     try {
-      await axios.delete(
-        `https://the-suits-project.onrender.com/api/delete/${id}`,
-      );
-      refreshAll();
+      await api.delete(`/api/delete/${id}`);
+      await refreshAll();
       setMessage("Product deleted successfully!");
     } catch (err) {
       console.error(err);
       setMessage("Delete failed");
+    }
+  };
+
+  const handleClearAllData = async () => {
+    const isConfirmed = window.confirm(
+      "This will permanently delete ALL inventory, stock in/out records, and report data. This action cannot be undone. Continue?",
+    );
+
+    if (!isConfirmed) return;
+
+    try {
+      await api.delete("/api/delete/all/data");
+      await refreshAll();
+      setMessage("All warehouse data has been cleared successfully.");
+    } catch (err) {
+      console.error(err);
+      setMessage("Failed to clear all data.");
     }
   };
 
@@ -229,8 +249,12 @@ function App() {
         <p className="subtitle">Inventory control for housekeeping operations</p>
       </section>
 
-      <button onClick={refreshAll} className="btn btn-primary refresh-btn">
-        Refresh Data
+      <button
+        onClick={() => refreshAll()}
+        className="btn btn-primary refresh-btn"
+        disabled={isRefreshing}
+      >
+        {isRefreshing ? "Refreshing..." : "Refresh Data"}
       </button>
 
       <section className="stats-grid">
@@ -421,9 +445,20 @@ function App() {
           </div>
         </div>
       </div>
+
+      <section className="danger-zone">
+        <h2>Admin: Dangerous Action</h2>
+        <p>
+          Permanently remove all inventory data, stock-in and stock-out records.
+          Use this only when you want to reset the system completely.
+        </p>
+        <button onClick={handleClearAllData} className="btn btn-clear-all">
+          Clear All Data
+        </button>
+      </section>
       <h2 className="inventory-title">Current Inventory</h2>
       <div className="inventory-table-wrapper">
-        {loading ? (
+        {inventoryLoading ? (
           <p className="loading-state">Loading inventory...</p>
         ) : (
           <table className="inventory-table">
@@ -474,7 +509,7 @@ function App() {
           </table>
         )}
       </div>
-      <Reports refreshKey={reportsRefreshKey} />
+      <Reports refreshKey={reportsRefreshKey} enabled={reportsReady} />
     </div>
   );
 }
