@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { setInventory } from "./features/inventory/inventorySlice.js";
 import { api, UNITS, getErrorMessage, isCanceled } from "./api.js";
 import Reports from "./components/reports.jsx";
+import ProductHistory from "./components/ProductHistory.jsx";
 import logo from "./assets/logo2.png";
 import "./App.css";
 
@@ -66,6 +67,7 @@ function App() {
 
   const [searchTerm, setSearchTerm] = useState("");
   const [showArchived, setShowArchived] = useState(false);
+  const [historyProductId, setHistoryProductId] = useState(null);
 
   // Only the latest load may write state; older/aborted responses are ignored.
   const loadSeqRef = useRef(0);
@@ -535,7 +537,14 @@ function App() {
                       )}
                     </td>
 
-                    <td data-label="action">
+                    <td data-label="action" className="action-cell">
+                      <button
+                        className="history-btn"
+                        onClick={() => setHistoryProductId(item._id)}
+                        title="Movements, corrections and min stock"
+                      >
+                        History
+                      </button>
                       {archived ? (
                         <button
                           className="restore-btn"
@@ -561,7 +570,24 @@ function App() {
           </table>
         )}
       </div>
-      <Reports sections={reports} onRetry={loadData} retrying={isLoading} />
+      <Reports
+        sections={reports}
+        stock={{
+          items,
+          loaded: inventoryState.loaded,
+          loading: inventoryState.loading,
+          error: inventoryState.error,
+        }}
+        onRetry={loadData}
+        retrying={isLoading}
+      />
+      {historyProductId && (
+        <ProductHistory
+          productId={historyProductId}
+          onClose={() => setHistoryProductId(null)}
+          onChanged={loadData}
+        />
+      )}
     </div>
   );
 }

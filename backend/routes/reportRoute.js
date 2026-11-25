@@ -8,7 +8,10 @@ const {
     getDailyStockInReport, 
     getStockOutByDateRange,
     getStockInByDateRange,
+    getCurrentStockReport,
 } = require("../controllers/reportController");
+
+router.get("/current-stock", getCurrentStockReport);
 
 router.get("/stock-out/daily", getDailyReport);
 router.get("/stock-out/weekly", getWeeklyReport);

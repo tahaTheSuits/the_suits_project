@@ -6,7 +6,12 @@ const {
     exportStockOutPDF,
     exportStockInPDF,
     getStockOutReport,
+    exportCurrentStockExcel,
+    exportCurrentStockPDF,
 } = require("../controllers/reportExportController");
+
+router.get("/current-stock/excel", exportCurrentStockExcel);
+router.get("/current-stock/pdf", exportCurrentStockPDF);
 
 router.get("/stock-out/excel", exportStockOutExcel);
 router.get("/stock-in/excel", exportStockInExcel);

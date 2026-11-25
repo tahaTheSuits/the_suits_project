@@ -1,9 +1,14 @@
 const ExcelJS = require("exceljs");
 const StockOut = require("../models/stockOutModel");
 const StockIn = require("../models/stockInModel");
-const mongoose = require("mongoose");
 const PDFDocument = require("pdfkit");
-const path = require("path");
+const { runMovementReport, correctionNote } = require("../utils/reportPipeline");
+const { buildCurrentStockReport } = require("./reportController");
+const { drawTable } = require("../utils/pdfTable");
+
+// NOTE (Phase 3): the stock in/out exports keep their existing layout and
+// date-range handling. Phase 2 only switches them to the shared pipeline so
+// they show corrected quantities (with a correction note) like the reports.
 
 // ================= EXPORT STOCK OUT EXCEL =================
 exports.exportStockOutExcel = async (req, res) => {
@@ -15,27 +20,7 @@ exports.exportStockOutExcel = async (req, res) => {
     const end = new Date(to);
     end.setHours(23, 59, 59, 999);
 
-    const data = await StockOut.aggregate([
-      { $match: { date: { $gte: start, $lte: end } } },
-      {
-        $lookup: {
-          from: "products",
-          localField: "product",
-          foreignField: "_id",
-          as: "productDetails",
-        },
-      },
-      {
-        $project: {
-          productName: { $arrayElemAt: ["$productDetails.name", 0] },
-          quantity: 1,
-          floor: 1,
-          usedBy: 1,
-          date: 1,
-        },
-      },
-      { $sort: { date: 1 } },
-    ]);
+    const data = await runMovementReport(StockOut, "out", { start, end }, { date: 1 });
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Stock Out Report");
@@ -46,6 +31,7 @@ exports.exportStockOutExcel = async (req, res) => {
       { header: "Quantity", key: "quantity", width: 15 },
       { header: "Floor", key: "floor", width: 20 },
       { header: "Used By", key: "usedBy", width: 25 },
+      { header: "Correction", key: "correction", width: 40 },
     ];
 
     data.forEach((item) => {
@@ -55,6 +41,7 @@ exports.exportStockOutExcel = async (req, res) => {
         quantity: item.quantity,
         floor: item.floor,
         usedBy: item.usedBy || "-",
+        correction: correctionNote(item),
       });
     });
 
@@ -85,26 +72,7 @@ exports.exportStockInExcel = async (req, res) => {
     const end = new Date(to);
     end.setHours(23, 59, 59, 999);
 
-    const data = await StockIn.aggregate([
-      { $match: { date: { $gte: start, $lte: end } } },
-      {
-        $lookup: {
-          from: "products",
-          localField: "product",
-          foreignField: "_id",
-          as: "productDetails",
-        },
-      },
-      {
-        $project: {
-          productName: { $arrayElemAt: ["$productDetails.name", 0] },
-          quantity: 1,
-          source: 1,
-          date: 1,
-        },
-      },
-      { $sort: { date: 1 } },
-    ]);
+    const data = await runMovementReport(StockIn, "in", { start, end }, { date: 1 });
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Stock In Report");
@@ -114,6 +82,7 @@ exports.exportStockInExcel = async (req, res) => {
       { header: "Product", key: "productName", width: 25 },
       { header: "Quantity", key: "quantity", width: 15 },
       { header: "Source", key: "source", width: 25 },
+      { header: "Correction", key: "correction", width: 40 },
     ];
 
     data.forEach((item) => {
@@ -122,6 +91,7 @@ exports.exportStockInExcel = async (req, res) => {
         productName: item.productName,
         quantity: item.quantity,
         source: item.source || "-",
+        correction: correctionNote(item),
       });
     });
 
@@ -143,8 +113,6 @@ exports.exportStockInExcel = async (req, res) => {
 };
 
 // ================= EXPORT STOCK OUT PDF =================
-// Export Stock Out Report to PDF
-// Export Stock Out Report to PDF
 exports.exportStockOutPDF = async (req, res) => {
   try {
     // تحويل القيم من query params إلى Date
@@ -156,12 +124,7 @@ exports.exportStockOutPDF = async (req, res) => {
       return res.status(400).json({ message: "Invalid date format" });
     }
 
-    // جلب البيانات من المونغو مع populate لجلب اسم المنتج
-    const stockOutData = await StockOut.find({
-      date: { $gte: from, $lte: to },
-    })
-      .populate("product") // ✅ populate للحصول على اسم المنتج
-      .sort({ date: 1 });
+    const stockOutData = await runMovementReport(StockOut, "out", { start: from, end: to }, { date: 1 });
 
     // إنشاء PDF
     const doc = new PDFDocument({ margin: 40 });
@@ -175,13 +138,14 @@ exports.exportStockOutPDF = async (req, res) => {
 
     stockOutData.forEach((item) => {
       const dateStr = item.date ? item.date.toLocaleDateString() : "Unknown Date";
-      const productName = item.product ? item.product.name : "Unknown Product";
+      const productName = item.productName || "Unknown Product";
       const quantity = item.quantity || 0;
       const floor = item.floor || "-";
       const usedBy = item.usedBy || "-";
+      const note = correctionNote(item);
 
       doc.fontSize(12).text(
-       ` ${dateStr} | ${productName} | Qty: ${quantity} | Floor: ${floor} | Used By: ${usedBy}`
+       ` ${dateStr} | ${productName} | Qty: ${quantity} | Floor: ${floor} | Used By: ${usedBy}${note ? ` | ${note}` : ""}`
       );
     });
 
@@ -202,11 +166,7 @@ exports.exportStockInPDF = async (req, res) => {
       return res.status(400).json({ message: "Invalid date format" });
     }
 
-    const stockInData = await StockIn.find({
-      date: { $gte: from, $lte: to },
-    })
-      .populate("product")
-      .sort({ date: 1 });
+    const stockInData = await runMovementReport(StockIn, "in", { start: from, end: to }, { date: 1 });
 
     const doc = new PDFDocument({ margin: 40 });
     res.setHeader("Content-Type", "application/pdf");
@@ -219,11 +179,12 @@ exports.exportStockInPDF = async (req, res) => {
 
     stockInData.forEach((item) => {
       const dateStr = item.date ? item.date.toLocaleDateString() : "Unknown Date";
-      const productName = item.product?.name || "Unknown Product";
+      const productName = item.productName || "Unknown Product";
       const source = item.source || "-";
+      const note = correctionNote(item);
 
       doc.fontSize(12).text(
-        `${dateStr} | ${productName} | Qty: ${item.quantity} | ${source}
+        `${dateStr} | ${productName} | Qty: ${item.quantity} | ${source}${note ? ` | ${note}` : ""}
       `);
     });
 
@@ -234,7 +195,118 @@ exports.exportStockInPDF = async (req, res) => {
   }
 };
 
+// ================= CURRENT STOCK (PDF / EXCEL) =================
+// GET /api/export/current-stock/{pdf|excel}[?includeArchived=true]
+
+const STATUS_TEXT = { out: "Out of stock", low: "Low", ok: "OK" };
+
+const conflictText = (row) => {
+  if (!row.unitConflicts.length) return "";
+  const count = row.unitConflicts.reduce((sum, c) => sum + c.count, 0);
+  const detail = row.unitConflicts.map((c) => `${c.quantity} ${c.unit} (${c.direction})`).join(", ");
+  return `${count} movement(s) in other units: ${detail}`;
+};
+
+const CURRENT_STOCK_COLUMNS = [
+  { header: "Product", width: 3, value: (r) => r.product + (r.isActive ? "" : " (archived)") },
+  { header: "Unit", width: 1, value: (r) => r.unit },
+  { header: "Available", width: 1.2, align: "right", value: (r) => r.quantity },
+  { header: "Min Stock", width: 1.4, align: "right", value: (r) => `${r.minStock}${r.minStockIsDefault ? " (default)" : ""}` },
+  { header: "Status", width: 1.3, value: (r) => STATUS_TEXT[r.status] || r.status },
+  { header: "Unit conflict", width: 3, value: (r) => conflictText(r) || "No" },
+];
+
+// Local calendar date, e.g. 2026-11-25 (server time zone).
+const isoDate = (date) => {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+};
+
+const currentStockFilename = (report, ext) =>
+  `current-stock${report.includeArchived ? "-with-archived" : ""}-${isoDate(report.generatedAt)}.${ext}`;
+
+exports.exportCurrentStockExcel = async (req, res) => {
+  try {
+    const report = await buildCurrentStockReport({ includeArchived: req.query.includeArchived === "true" });
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Current Stock");
+    sheet.columns = [
+      { header: "Product", key: "product", width: 32 },
+      { header: "Unit", key: "unit", width: 10 },
+      { header: "Available", key: "quantity", width: 12 },
+      { header: "Min Stock", key: "minStock", width: 12 },
+      { header: "Min Stock Source", key: "minStockSource", width: 18 },
+      { header: "Status", key: "status", width: 14 },
+      { header: "Archived", key: "archived", width: 10 },
+      { header: "Unit Conflict", key: "unitConflict", width: 50 },
+    ];
+    sheet.getRow(1).font = { bold: true };
+    sheet.views = [{ state: "frozen", ySplit: 1 }];
+
+    report.rows.forEach((row) => {
+      sheet.addRow({
+        product: row.product,
+        unit: row.unit,
+        quantity: row.quantity,
+        minStock: row.minStock,
+        minStockSource: row.minStockIsDefault ? "default" : "set",
+        status: STATUS_TEXT[row.status] || row.status,
+        archived: row.isActive ? "No" : "Yes",
+        unitConflict: conflictText(row) || "No",
+      });
+    });
+
+    sheet.addRow([]);
+    sheet.addRow([`Generated ${report.generatedAt.toISOString()}`]);
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename=${currentStockFilename(report, "xlsx")}`);
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    console.error(err);
+    if (!res.headersSent) res.status(500).json({ message: "Excel export failed" });
+  }
+};
+
+exports.exportCurrentStockPDF = async (req, res) => {
+  let report;
+  try {
+    report = await buildCurrentStockReport({ includeArchived: req.query.includeArchived === "true" });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "PDF export failed" });
+  }
+
+  const doc = new PDFDocument({ margin: 40, size: "A4", layout: "landscape" });
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename=${currentStockFilename(report, "pdf")}`);
+  doc.pipe(res);
+
+  const { summary } = report;
+  doc.font("Helvetica-Bold").fontSize(18).text("Current Stock Report", { align: "center" });
+  doc.font("Helvetica").fontSize(10).fillColor("#596460").text(
+    `Generated ${report.generatedAt.toUTCString()}${report.includeArchived ? " - includes archived products" : ""}`,
+    { align: "center" },
+  );
+  doc.moveDown(0.4).text(
+    `${summary.products} products - ${summary.out} out of stock - ${summary.low} low - ${summary.ok} OK` +
+      (summary.withUnitConflicts ? ` - ${summary.withUnitConflicts} with unit conflicts` : ""),
+    { align: "center" },
+  );
+  doc.fillColor("#000000").moveDown(1);
+
+  if (report.rows.length === 0) {
+    doc.fontSize(12).text("No products.", { align: "center" });
+  } else {
+    drawTable(doc, { columns: CURRENT_STOCK_COLUMNS, rows: report.rows });
+  }
+  doc.end();
+};
+
 // ================= STOCK OUT REPORT WITH PAGINATION =================
+// (unchanged, unused by the frontend; uses raw quantities — see Phase 3 notes)
 exports.getStockOutReport = async (req, res) => {
   try {
     let { from, to, page = 1, limit = 20 } = req.query;

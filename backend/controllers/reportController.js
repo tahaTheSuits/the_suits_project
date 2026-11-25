@@ -1,6 +1,7 @@
 const StockOut = require("../models/stockOutModel");
 const StockIn = require("../models/stockInModel");
-const { normalizeUnit } = require("../utils/units");
+const { runMovementReport } = require("../utils/reportPipeline");
+const { getCurrentStock } = require("../utils/stock");
 
 // Helpers
 const getDayRange = (date) => {
@@ -34,47 +35,13 @@ const getRequestedRange = (req) => {
   return { start, end };
 };
 
-// Movements of archived products stay in reports; they are flagged instead.
-const buildPipeline = ({ start, end }, extraFields, sort) => [
-  { $match: { date: { $gte: start, $lte: end } } },
-  {
-    $lookup: {
-      from: "products",
-      localField: "product",
-      foreignField: "_id",
-      as: "productDetails",
-    },
-  },
-  {
-    $project: {
-      productName: { $arrayElemAt: ["$productDetails.name", 0] },
-      unit: { $ifNull: [{ $arrayElemAt: ["$productDetails.unit", 0] }, "$unit"] },
-      productArchived: {
-        $eq: [{ $arrayElemAt: ["$productDetails.isActive", 0] }, false],
-      },
-      quantity: 1,
-      date: 1,
-      ...extraFields,
-    },
-  },
-  { $sort: sort },
-];
-
-const OUT_FIELDS = { usedBy: 1, floor: 1 };
-const IN_FIELDS = { source: 1 };
-
-// Legacy "galon" -> "gallon" so the UI never sees two spellings.
-const normalizeRows = (rows) =>
-  rows.map((row) => ({ ...row, unit: normalizeUnit(row.unit) || row.unit }));
-
-const reportHandler = (Model, getRange, extraFields, sort, errorMessage) => async (req, res) => {
+const reportHandler = (Model, movementType, getRange, sort, errorMessage) => async (req, res) => {
   try {
     const range = getRange(req);
     if (!range) {
       return res.status(400).json({ message: "Valid from and to dates are required" });
     }
-    const rows = await Model.aggregate(buildPipeline(range, extraFields, sort));
-    res.json(normalizeRows(rows));
+    res.json(await runMovementReport(Model, movementType, range, sort));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: errorMessage });
@@ -86,27 +53,55 @@ const thisWeek = () => getWeekRange(new Date());
 
 // --- Stock Out Reports ---
 exports.getDailyReport = reportHandler(
-  StockOut, today, OUT_FIELDS, { productName: 1, floor: 1, date: 1 }, "Failed to fetch daily report",
+  StockOut, "out", today, { productName: 1, floor: 1, date: 1 }, "Failed to fetch daily report",
 );
 
 exports.getWeeklyReport = reportHandler(
-  StockOut, thisWeek, OUT_FIELDS, { productName: 1, floor: 1, date: 1 }, "Failed to fetch weekly report",
+  StockOut, "out", thisWeek, { productName: 1, floor: 1, date: 1 }, "Failed to fetch weekly report",
 );
 
 // --- Stock In Reports ---
 exports.getDailyStockInReport = reportHandler(
-  StockIn, today, IN_FIELDS, { productName: 1, date: 1 }, "Failed to fetch daily stock in report",
+  StockIn, "in", today, { productName: 1, date: 1 }, "Failed to fetch daily stock in report",
 );
 
 exports.getWeeklyStockInReport = reportHandler(
-  StockIn, thisWeek, IN_FIELDS, { productName: 1, date: 1 }, "Failed to fetch weekly stock in report",
+  StockIn, "in", thisWeek, { productName: 1, date: 1 }, "Failed to fetch weekly stock in report",
 );
 
 // --- Date range reports ---
 exports.getStockInByDateRange = reportHandler(
-  StockIn, getRequestedRange, IN_FIELDS, { date: 1 }, "Failed to fetch stock in report",
+  StockIn, "in", getRequestedRange, { date: 1 }, "Failed to fetch stock in report",
 );
 
 exports.getStockOutByDateRange = reportHandler(
-  StockOut, getRequestedRange, { floor: 1, usedBy: 1 }, { date: 1 }, "Failed to fetch stock out report",
+  StockOut, "out", getRequestedRange, { date: 1 }, "Failed to fetch stock out report",
 );
+
+
+// --- Current Stock ---
+// GET /api/reports/current-stock[?includeArchived=true]
+// True ledger balance per product (StockIn - StockOut, corrections applied),
+// in the product's unit. Same rows as GET /api/inventory.
+const summarize = (rows) => ({
+  products: rows.length,
+  out: rows.filter((r) => r.status === "out").length,
+  low: rows.filter((r) => r.status === "low").length,
+  ok: rows.filter((r) => r.status === "ok").length,
+  withUnitConflicts: rows.filter((r) => r.unitConflicts.length > 0).length,
+});
+
+exports.buildCurrentStockReport = async ({ includeArchived = false } = {}) => {
+  const rows = await getCurrentStock({ includeArchived });
+  return { generatedAt: new Date(), includeArchived, summary: summarize(rows), rows };
+};
+
+exports.getCurrentStockReport = async (req, res) => {
+  try {
+    const includeArchived = req.query.includeArchived === "true";
+    res.json(await exports.buildCurrentStockReport({ includeArchived }));
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Failed to fetch current stock report" });
+  }
+};

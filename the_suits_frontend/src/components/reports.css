@@ -74,6 +74,7 @@
   color: #33433f;
 }
 
+.current-stock-actions button,
 .export-section button {
   border: none;
   border-radius: 8px;
@@ -85,6 +86,12 @@
   cursor: pointer;
 }
 
+.current-stock-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.current-stock-actions button:hover,
 .export-section button:hover {
   background: #51655e;
 }

@@ -1,9 +1,11 @@
 // src/components/reports.jsx
+// Quantities are effective (corrected) values; corrected rows are tagged.
 // Report data is loaded once by App (shared with the dashboard stats) and
 // passed in per section, so each table loads and fails independently.
 import { useState } from "react";
 import { saveAs } from "file-saver";
 import { api } from "../api.js";
+import CurrentStockReport from "./CurrentStockReport.jsx";
 import "./reports.css";
 
 const SECTIONS = [
@@ -53,7 +55,19 @@ function ReportTable({ title, section, onRetry, retrying }) {
                     {item.productName || "Unknown product"}
                     {item.productArchived && <span className="archived-tag">archived</span>}
                   </td>
-                  <td data-label="Quantity">{item.quantity}</td>
+                  <td data-label="Quantity">
+                    {item.quantity}
+                    {item.corrected && (
+                      <span
+                        className="corrected-tag"
+                        title={`Recorded as ${item.originalQuantity} ${item.originalUnit || ""}${
+                          item.correctionReason ? ` — ${item.correctionReason}` : ""
+                        }`}
+                      >
+                        corrected
+                      </span>
+                    )}
+                  </td>
                   <td data-label="Unit">{item.unit}</td>
                 </tr>
               ))}
@@ -65,7 +79,7 @@ function ReportTable({ title, section, onRetry, retrying }) {
   );
 }
 
-export default function Reports({ sections, onRetry, retrying }) {
+export default function Reports({ sections, stock, onRetry, retrying }) {
   const [error, setError] = useState("");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -98,6 +112,8 @@ export default function Reports({ sections, onRetry, retrying }) {
   return (
     <div className="reports-container">
       <h1 className="reports-title">Reports Dashboard</h1>
+      <CurrentStockReport {...stock} onRetry={onRetry} />
+
       {error && <p className="reports-error">{error}</p>}
 
       {/* Date Filters */}

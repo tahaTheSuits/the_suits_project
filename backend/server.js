@@ -11,6 +11,7 @@ const deleteRoute = require('./routes/deleteRoute');
 const dailyReportsRoute = require('./routes/dailyReportsRoute');
 const reportExportRoute = require('./routes/reportExportRoute');
 const reportRoute = require('./routes/reportRoute');
+const adjustmentsRoute = require('./routes/adjustmentsRoute');
 const { ensureIndexes } = require('./utils/dbMaintenance');
 
 
@@ -34,6 +35,7 @@ app.use('/api/daily-reports', dailyReportsRoute);
 app.use('/api/delete', deleteRoute);
 app.use('/api/reports', reportRoute);
 app.use('/api/export', reportExportRoute);
+app.use('/api/adjustments', adjustmentsRoute);
 //app.use('/api/export', reportExportRoute);
 
 

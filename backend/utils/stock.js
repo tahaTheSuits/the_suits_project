@@ -1,13 +1,17 @@
 // Inventory ledger helpers.
-// Current stock = sum(StockIn.quantity) - sum(StockOut.quantity) per product.
-// Product.quantity is only a cache of that value.
+// Current stock = sum(effective StockIn) - sum(effective StockOut) per product,
+// where a movement's effective quantity is its latest correction
+// (Adjustment kind "movement_correction") or, if never corrected, its own
+// quantity. Product.quantity is only a cache of that value.
 
 const Product = require("../models/productModel");
 const StockIn = require("../models/stockInModel");
 const StockOut = require("../models/stockOutModel");
+const Adjustment = require("../models/adjustmentModel");
 const { DEFAULT_UNIT, normalizeUnit } = require("./units");
 
 const DEFAULT_MIN_STOCK = 5;
+const MOVEMENT_MODELS = { in: StockIn, out: StockOut };
 
 // Returns the minStock that should be used for status, and whether it is
 // the fallback default (value missing / invalid on the product).
@@ -29,28 +33,57 @@ function stockStatus(quantity, minStock) {
 
 const productUnitOf = (product) => normalizeUnit(product.unit) || DEFAULT_UNIT;
 
+// Aggregation stage: attaches `latestCorrection` (0 or 1 element) to each
+// StockIn/StockOut document.
+const latestCorrectionLookup = (movementType) => ({
+  $lookup: {
+    from: Adjustment.collection.name,
+    let: { movementId: "$_id" },
+    pipeline: [
+      {
+        $match: {
+          $expr: { $eq: ["$movement", "$$movementId"] },
+          kind: "movement_correction",
+          movementType,
+        },
+      },
+      { $sort: { revision: -1 } },
+      { $limit: 1 },
+      { $project: { correctedQuantity: 1, revision: 1, reason: 1, createdAt: 1 } },
+    ],
+    as: "latestCorrection",
+  },
+});
+
+// Expression for the effective quantity after latestCorrectionLookup.
+const EFFECTIVE_QUANTITY = {
+  $ifNull: [{ $arrayElemAt: ["$latestCorrection.correctedQuantity", 0] }, "$quantity"],
+};
+const IS_CORRECTED = { $gt: [{ $size: "$latestCorrection" }, 0] };
+
 // Computes ledger totals for the given products (lean docs or documents).
-// Movements recorded in a unit different from the product's unit are still
-// counted (they are almost always data-entry mistakes from the old free unit
-// dropdown, and dropping them would silently change stock levels), but they
-// are reported in `unitConflicts` so they can be reviewed instead of being
-// silently summed.
+// Uncorrected movements recorded in a unit different from the product's
+// unit are still counted (they are almost always data-entry mistakes from
+// the old free unit dropdown), but they are reported in `unitConflicts` so
+// they can be reviewed and corrected. A corrected movement is always in the
+// product's unit, so correcting it resolves the conflict.
 async function computeLedger(products) {
   const ids = products.map((p) => p._id);
-  const pipeline = [
+  const pipeline = (movementType) => [
     { $match: { product: { $in: ids } } },
+    latestCorrectionLookup(movementType),
     {
       $group: {
-        _id: { product: "$product", unit: "$unit" },
-        total: { $sum: "$quantity" },
+        _id: { product: "$product", unit: "$unit", corrected: IS_CORRECTED },
+        total: { $sum: EFFECTIVE_QUANTITY },
         count: { $sum: 1 },
       },
     },
   ];
 
   const [ins, outs] = await Promise.all([
-    StockIn.aggregate(pipeline),
-    StockOut.aggregate(pipeline),
+    StockIn.aggregate(pipeline("in")),
+    StockOut.aggregate(pipeline("out")),
   ]);
 
   const units = new Map(products.map((p) => [String(p._id), productUnitOf(p)]));
@@ -68,7 +101,7 @@ async function computeLedger(products) {
       else entry.totalOut += total;
 
       const unit = normalizeUnit(row._id.unit) || DEFAULT_UNIT;
-      if (unit !== units.get(id)) {
+      if (!row._id.corrected && unit !== units.get(id)) {
         const key = `${direction}:${unit}`;
         const conflict = entry.conflicts.get(key) || { direction, unit, quantity: 0, count: 0 };
         conflict.quantity += total;
@@ -92,6 +125,33 @@ async function computeLedger(products) {
   return result;
 }
 
+// One row per product, shared by GET /api/inventory and the Current Stock
+// report/exports so they can never disagree.
+function toStockRow(product, totals) {
+  const minStock = effectiveMinStock(product.minStock);
+  return {
+    _id: product._id,
+    product: product.name,
+    quantity: totals.quantity,
+    totalIn: totals.totalIn,
+    totalOut: totals.totalOut,
+    unit: productUnitOf(product),
+    minStock: minStock.value,
+    minStockIsDefault: minStock.isDefault,
+    status: stockStatus(totals.quantity, minStock.value),
+    isActive: product.isActive !== false,
+    archivedAt: product.archivedAt || null,
+    unitConflicts: totals.unitConflicts,
+  };
+}
+
+async function getCurrentStock({ includeArchived = false } = {}) {
+  const filter = includeArchived ? {} : { isActive: { $ne: false } };
+  const products = await Product.find(filter).sort({ name: 1 }).lean();
+  const ledger = await computeLedger(products);
+  return products.map((product) => toStockRow(product, ledger.get(String(product._id))));
+}
+
 async function availableFor(product) {
   const ledger = await computeLedger([product]);
   return ledger.get(String(product._id)).quantity;
@@ -106,10 +166,16 @@ async function syncQuantityCache(product) {
 
 module.exports = {
   DEFAULT_MIN_STOCK,
+  MOVEMENT_MODELS,
   effectiveMinStock,
   stockStatus,
   productUnitOf,
+  latestCorrectionLookup,
+  EFFECTIVE_QUANTITY,
+  IS_CORRECTED,
   computeLedger,
+  toStockRow,
+  getCurrentStock,
   availableFor,
   syncQuantityCache,
 };
