@@ -1,209 +1,156 @@
+// PDF / Excel exports.
+//   GET /api/export/{stock-in|stock-out}/{pdf|excel}?from=YYYY-MM-DD&to=YYYY-MM-DD
+//   GET /api/export/current-stock/{pdf|excel}?includeArchived=true
+//
+// Every export: builds the data first, renders the file fully in memory,
+// then sends it with a descriptive filename (never "undefined"). Errors are
+// returned as JSON with a proper status before anything is streamed.
+// Dates may be omitted (all dates) or given individually; ranges are
+// inclusive of the whole end day, for stock in AND stock out.
 const ExcelJS = require("exceljs");
+const PDFDocument = require("pdfkit");
 const StockOut = require("../models/stockOutModel");
 const StockIn = require("../models/stockInModel");
-const PDFDocument = require("pdfkit");
 const { runMovementReport, correctionNote } = require("../utils/reportPipeline");
 const { buildCurrentStockReport } = require("./reportController");
-const { drawTable } = require("../utils/pdfTable");
+const { drawReportHeader, drawTable, addPageFooters } = require("../utils/pdfTable");
+const {
+  resolveExportRange,
+  formatDate,
+  formatDateTime,
+  isoToday,
+  excelDate,
+  totalsByUnit,
+  formatTotals,
+  pdfToBuffer,
+  sendFile,
+  exportHandler,
+} = require("../utils/exportHelpers");
 
-// NOTE (Phase 3): the stock in/out exports keep their existing layout and
-// date-range handling. Phase 2 only switches them to the shared pipeline so
-// they show corrected quantities (with a correction note) like the reports.
+const HEADER_FILL = "FF5F756D";
 
-// ================= EXPORT STOCK OUT EXCEL =================
-exports.exportStockOutExcel = async (req, res) => {
-  try {
-    const { from, to } = req.query;
+// ================= MOVEMENT EXPORTS (stock in / stock out) =================
 
-    const start = new Date(from);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(to);
-    end.setHours(23, 59, 59, 999);
-
-    const data = await runMovementReport(StockOut, "out", { start, end }, { date: 1 });
-
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet("Stock Out Report");
-
-    sheet.columns = [
-      { header: "Date", key: "date", width: 20 },
-      { header: "Product", key: "productName", width: 25 },
-      { header: "Quantity", key: "quantity", width: 15 },
-      { header: "Floor", key: "floor", width: 20 },
-      { header: "Used By", key: "usedBy", width: 25 },
-      { header: "Correction", key: "correction", width: 40 },
-    ];
-
-    data.forEach((item) => {
-      sheet.addRow({
-        date: item.date.toISOString().split("T")[0],
-        productName: item.productName,
-        quantity: item.quantity,
-        floor: item.floor,
-        usedBy: item.usedBy || "-",
-        correction: correctionNote(item),
-      });
-    });
-
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
-    res.setHeader(
-      "Content-Disposition",
-      "attachment; filename=stock-out-report.xlsx"
-    );
-
-    await workbook.xlsx.write(res);
-    res.end();
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Excel export failed" });
-  }
+const MOVEMENT_EXPORTS = {
+  in: { Model: StockIn, title: "Stock In Report", file: "stock-in-report", sheet: "Stock In" },
+  out: { Model: StockOut, title: "Stock Out Report", file: "stock-out-report", sheet: "Stock Out" },
 };
 
-// ================= EXPORT STOCK IN EXCEL =================
-exports.exportStockInExcel = async (req, res) => {
-  try {
-    const { from, to } = req.query;
+// Same order as the on-screen report tables: product name, then date.
+const MOVEMENT_SORT = { sortName: 1, date: 1 };
 
-    const start = new Date(from);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(to);
-    end.setHours(23, 59, 59, 999);
+const productLabel = (row) =>
+  `${row.productName || "Unknown product"}${row.productArchived ? " (archived)" : ""}`;
 
-    const data = await runMovementReport(StockIn, "in", { start, end }, { date: 1 });
+async function loadMovementExport(movementType, query) {
+  const config = MOVEMENT_EXPORTS[movementType];
+  const range = resolveExportRange(query);
+  const rows = await runMovementReport(config.Model, movementType, range, MOVEMENT_SORT);
+  const totals = totalsByUnit(rows);
+  const correctedCount = rows.filter((r) => r.corrected).length;
 
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet("Stock In Report");
-
-    sheet.columns = [
-      { header: "Date", key: "date", width: 20 },
-      { header: "Product", key: "productName", width: 25 },
-      { header: "Quantity", key: "quantity", width: 15 },
-      { header: "Source", key: "source", width: 25 },
-      { header: "Correction", key: "correction", width: 40 },
-    ];
-
-    data.forEach((item) => {
-      sheet.addRow({
-        date: item.date.toISOString().split("T")[0],
-        productName: item.productName,
-        quantity: item.quantity,
-        source: item.source || "-",
-        correction: correctionNote(item),
-      });
-    });
-
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
-    res.setHeader(
-      "Content-Disposition",
-      "attachment; filename=stock-in-report.xlsx"
-    );
-
-    await workbook.xlsx.write(res);
-    res.end();
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Excel export failed" });
+  // Columns: only what the data actually has. Floor / Used By are not part
+  // of the schema, so they are no longer exported as empty columns.
+  const columns = [
+    { header: "Date", width: 1.3, excelWidth: 12, value: (r) => formatDate(r.date), excel: (r) => excelDate(r.date), numFmt: "dd/mm/yyyy" },
+    { header: "Product", width: 3.2, excelWidth: 32, value: productLabel },
+    { header: "Quantity", width: 1.1, excelWidth: 11, align: "right", value: (r) => r.quantity },
+    { header: "Unit", width: 1, excelWidth: 9, value: (r) => r.unit },
+  ];
+  if (movementType === "in") {
+    columns.push({ header: "Source", width: 1.9, excelWidth: 18, value: (r) => r.source || "" });
   }
-};
+  if (correctedCount > 0) {
+    columns.push({ header: "Correction", width: 3.4, excelWidth: 45, muted: true, value: correctionNote });
+  }
 
-// ================= EXPORT STOCK OUT PDF =================
-exports.exportStockOutPDF = async (req, res) => {
-  try {
-    // تحويل القيم من query params إلى Date
-    const from = req.query.from ? new Date(req.query.from) : new Date("2000-01-01");
-    const to = req.query.to ? new Date(req.query.to) : new Date();
+  const contextLines = [
+    `Period: ${range.label}`,
+    rows.length
+      ? `${rows.length} movement${rows.length === 1 ? "" : "s"} · Totals by unit: ${formatTotals(totals)}`
+      : "No movements in this period",
+    correctedCount
+      ? `${correctedCount} corrected entr${correctedCount === 1 ? "y shows its" : "ies show their"} corrected quantity; the original is in the Correction column`
+      : "",
+    `Generated ${formatDateTime(new Date())}`,
+  ].filter(Boolean);
 
-    // تحقق من صحة التاريخ
-    if (isNaN(from.getTime()) || isNaN(to.getTime())) {
-      return res.status(400).json({ message: "Invalid date format" });
-    }
-
-    const stockOutData = await runMovementReport(StockOut, "out", { start: from, end: to }, { date: 1 });
-
-    // إنشاء PDF
-    const doc = new PDFDocument({ margin: 40 });
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", "attachment; filename=stock-out-report.pdf");
-
-    doc.pipe(res);
-
-    doc.fontSize(20).text("Stock Out Report", { align: "center" });
-    doc.moveDown();
-
-    stockOutData.forEach((item) => {
-      const dateStr = item.date ? item.date.toLocaleDateString() : "Unknown Date";
-      const productName = item.productName || "Unknown Product";
-      const quantity = item.quantity || 0;
-      const floor = item.floor || "-";
-      const usedBy = item.usedBy || "-";
-      const note = correctionNote(item);
-
-      doc.fontSize(12).text(
-       ` ${dateStr} | ${productName} | Qty: ${quantity} | Floor: ${floor} | Used By: ${usedBy}${note ? ` | ${note}` : ""}`
-      );
-    });
-
-    doc.end();
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "PDF export failed", error: err.message });
+  return { ...config, range, rows, totals, columns, contextLines };
 }
-};
-// ================= EXPORT STOCK IN PDF =================
-exports.exportStockInPDF = async (req, res) => {
-  try {
-    const from = req.query.from ? new Date(req.query.from) : new Date("2000-01-01");
-    const to = req.query.to ? new Date(req.query.to) : new Date();
-    to.setHours(23, 59, 59, 999);
 
-    if (isNaN(from.getTime()) || isNaN(to.getTime())) {
-      return res.status(400).json({ message: "Invalid date format" });
+async function movementPdf(req, res, movementType) {
+  const data = await loadMovementExport(movementType, req.query);
+  const doc = new PDFDocument({ margin: 40, size: "A4", bufferPages: true });
+  const buffer = await pdfToBuffer(doc, () => {
+    drawReportHeader(doc, { title: data.title, lines: data.contextLines });
+    if (data.rows.length === 0) {
+      doc.font("Helvetica").fontSize(11).text("No movements in this period.", { align: "center" });
+    } else {
+      drawTable(doc, { columns: data.columns, rows: data.rows });
     }
+    addPageFooters(doc, `${data.title} · ${data.range.label}`);
+  });
+  sendFile(res, buffer, `${data.file}_${data.range.slug}.pdf`);
+}
 
-    const stockInData = await runMovementReport(StockIn, "in", { start: from, end: to }, { date: 1 });
+async function movementExcel(req, res, movementType) {
+  const data = await loadMovementExport(movementType, req.query);
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet(data.sheet);
+  const lastCol = data.columns.length;
 
-    const doc = new PDFDocument({ margin: 40 });
-    res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", "attachment; filename=stock-in-report.pdf");
+  sheet.addRow([data.title]).font = { bold: true, size: 14 };
+  data.contextLines.forEach((line) => sheet.addRow([line]).font = { color: { argb: "FF596460" } });
+  sheet.addRow([]);
 
-    doc.pipe(res);
+  const headerRow = sheet.addRow(data.columns.map((c) => c.header));
+  headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  headerRow.eachCell((cell) => {
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: HEADER_FILL } };
+  });
+  const headerRowNumber = headerRow.number;
 
-    doc.fontSize(18).text("Stock In Report", { align: "center" });
-    doc.moveDown();
+  data.rows.forEach((row) => {
+    sheet.addRow(data.columns.map((c) => (c.excel ? c.excel(row) : c.value(row))));
+  });
 
-    stockInData.forEach((item) => {
-      const dateStr = item.date ? item.date.toLocaleDateString() : "Unknown Date";
-      const productName = item.productName || "Unknown Product";
-      const source = item.source || "-";
-      const note = correctionNote(item);
+  data.columns.forEach((c, i) => {
+    const column = sheet.getColumn(i + 1);
+    column.width = c.excelWidth;
+    if (c.numFmt) column.numFmt = c.numFmt;
+    if (c.align) column.alignment = { horizontal: c.align };
+  });
 
-      doc.fontSize(12).text(
-        `${dateStr} | ${productName} | Qty: ${item.quantity} | ${source}${note ? ` | ${note}` : ""}
-      `);
+  if (data.rows.length) {
+    sheet.addRow([]);
+    data.totals.forEach((t) => {
+      const row = sheet.addRow(["Total", "", t.quantity, t.unit]);
+      row.font = { bold: true };
     });
-
-    doc.end();
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "PDF export failed", error: err.message });
+    sheet.autoFilter = {
+      from: { row: headerRowNumber, column: 1 },
+      to: { row: headerRowNumber + data.rows.length, column: lastCol },
+    };
   }
-};
+  sheet.views = [{ state: "frozen", ySplit: headerRowNumber }];
+
+  const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+  sendFile(res, buffer, `${data.file}_${data.range.slug}.xlsx`);
+}
+
+exports.exportStockInPDF = exportHandler("Stock in PDF export", (req, res) => movementPdf(req, res, "in"));
+exports.exportStockOutPDF = exportHandler("Stock out PDF export", (req, res) => movementPdf(req, res, "out"));
+exports.exportStockInExcel = exportHandler("Stock in Excel export", (req, res) => movementExcel(req, res, "in"));
+exports.exportStockOutExcel = exportHandler("Stock out Excel export", (req, res) => movementExcel(req, res, "out"));
 
 // ================= CURRENT STOCK (PDF / EXCEL) =================
-// GET /api/export/current-stock/{pdf|excel}[?includeArchived=true]
 
 const STATUS_TEXT = { out: "Out of stock", low: "Low", ok: "OK" };
 
 const conflictText = (row) => {
   if (!row.unitConflicts.length) return "";
   const count = row.unitConflicts.reduce((sum, c) => sum + c.count, 0);
-  const detail = row.unitConflicts.map((c) => `${c.quantity} ${c.unit} (${c.direction})`).join(", ");
+  const detail = row.unitConflicts.map((c) => `${c.quantity} ${c.unit} (stock ${c.direction})`).join(", ");
   return `${count} movement(s) in other units: ${detail}`;
 };
 
@@ -216,137 +163,77 @@ const CURRENT_STOCK_COLUMNS = [
   { header: "Unit conflict", width: 3, value: (r) => conflictText(r) || "No" },
 ];
 
-// Local calendar date, e.g. 2026-11-25 (server time zone).
-const isoDate = (date) => {
-  const pad = (n) => String(n).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-};
-
 const currentStockFilename = (report, ext) =>
-  `current-stock${report.includeArchived ? "-with-archived" : ""}-${isoDate(report.generatedAt)}.${ext}`;
+  `current-stock${report.includeArchived ? "-with-archived" : ""}_${isoToday()}.${ext}`;
 
-exports.exportCurrentStockExcel = async (req, res) => {
-  try {
-    const report = await buildCurrentStockReport({ includeArchived: req.query.includeArchived === "true" });
-
-    const workbook = new ExcelJS.Workbook();
-    const sheet = workbook.addWorksheet("Current Stock");
-    sheet.columns = [
-      { header: "Product", key: "product", width: 32 },
-      { header: "Unit", key: "unit", width: 10 },
-      { header: "Available", key: "quantity", width: 12 },
-      { header: "Min Stock", key: "minStock", width: 12 },
-      { header: "Min Stock Source", key: "minStockSource", width: 18 },
-      { header: "Status", key: "status", width: 14 },
-      { header: "Archived", key: "archived", width: 10 },
-      { header: "Unit Conflict", key: "unitConflict", width: 50 },
-    ];
-    sheet.getRow(1).font = { bold: true };
-    sheet.views = [{ state: "frozen", ySplit: 1 }];
-
-    report.rows.forEach((row) => {
-      sheet.addRow({
-        product: row.product,
-        unit: row.unit,
-        quantity: row.quantity,
-        minStock: row.minStock,
-        minStockSource: row.minStockIsDefault ? "default" : "set",
-        status: STATUS_TEXT[row.status] || row.status,
-        archived: row.isActive ? "No" : "Yes",
-        unitConflict: conflictText(row) || "No",
-      });
-    });
-
-    sheet.addRow([]);
-    sheet.addRow([`Generated ${report.generatedAt.toISOString()}`]);
-
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename=${currentStockFilename(report, "xlsx")}`);
-    await workbook.xlsx.write(res);
-    res.end();
-  } catch (err) {
-    console.error(err);
-    if (!res.headersSent) res.status(500).json({ message: "Excel export failed" });
-  }
-};
-
-exports.exportCurrentStockPDF = async (req, res) => {
-  let report;
-  try {
-    report = await buildCurrentStockReport({ includeArchived: req.query.includeArchived === "true" });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ message: "PDF export failed" });
-  }
-
-  const doc = new PDFDocument({ margin: 40, size: "A4", layout: "landscape" });
-  res.setHeader("Content-Type", "application/pdf");
-  res.setHeader("Content-Disposition", `attachment; filename=${currentStockFilename(report, "pdf")}`);
-  doc.pipe(res);
-
+const currentStockLines = (report) => {
   const { summary } = report;
-  doc.font("Helvetica-Bold").fontSize(18).text("Current Stock Report", { align: "center" });
-  doc.font("Helvetica").fontSize(10).fillColor("#596460").text(
-    `Generated ${report.generatedAt.toUTCString()}${report.includeArchived ? " - includes archived products" : ""}`,
-    { align: "center" },
-  );
-  doc.moveDown(0.4).text(
-    `${summary.products} products - ${summary.out} out of stock - ${summary.low} low - ${summary.ok} OK` +
-      (summary.withUnitConflicts ? ` - ${summary.withUnitConflicts} with unit conflicts` : ""),
-    { align: "center" },
-  );
-  doc.fillColor("#000000").moveDown(1);
-
-  if (report.rows.length === 0) {
-    doc.fontSize(12).text("No products.", { align: "center" });
-  } else {
-    drawTable(doc, { columns: CURRENT_STOCK_COLUMNS, rows: report.rows });
-  }
-  doc.end();
+  return [
+    `As of ${formatDateTime(report.generatedAt)}${report.includeArchived ? " · includes archived products" : ""}`,
+    `${summary.products} products · ${summary.out} out of stock · ${summary.low} low · ${summary.ok} OK` +
+      (summary.withUnitConflicts ? ` · ${summary.withUnitConflicts} with unit conflicts` : ""),
+    "Quantities are in each product's own unit, with corrections applied",
+  ];
 };
 
-// ================= STOCK OUT REPORT WITH PAGINATION =================
-// (unchanged, unused by the frontend; uses raw quantities — see Phase 3 notes)
-exports.getStockOutReport = async (req, res) => {
-  try {
-    let { from, to, page = 1, limit = 20 } = req.query;
+exports.exportCurrentStockExcel = exportHandler("Current stock Excel export", async (req, res) => {
+  const report = await buildCurrentStockReport({ includeArchived: req.query.includeArchived === "true" });
 
-    const start = from
-      ? new Date(from)
-      : new Date(new Date().setHours(0, 0, 0, 0));
-    const end = to
-      ? new Date(to)
-      : new Date(new Date().setHours(23, 59, 59, 999));
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet("Current Stock");
+  sheet.addRow(["Current Stock Report"]).font = { bold: true, size: 14 };
+  currentStockLines(report).forEach((line) => sheet.addRow([line]).font = { color: { argb: "FF596460" } });
+  sheet.addRow([]);
 
-    page = Number(page);
-    limit = Number(limit);
+  const headers = ["Product", "Unit", "Available", "Min Stock", "Min Stock Source", "Status", "Archived", "Unit Conflict"];
+  const widths = [32, 10, 12, 12, 18, 14, 10, 50];
+  const headerRow = sheet.addRow(headers);
+  headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  headerRow.eachCell((cell) => {
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: HEADER_FILL } };
+  });
+  widths.forEach((w, i) => { sheet.getColumn(i + 1).width = w; });
 
-    const filter = {
-      createdAt: { $gte: start, $lte: end },
-    };
-
-    const data = await StockOut.find(filter)
-      .populate("product", "name sku")
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(limit);
-
-    const totalCount = await StockOut.countDocuments(filter);
-
-    const totalQuantity = await StockOut.aggregate([
-      { $match: filter },
-      { $group: { _id: null, total: { $sum: "$quantity" } } },
+  report.rows.forEach((row) => {
+    sheet.addRow([
+      row.product,
+      row.unit,
+      row.quantity,
+      row.minStock,
+      row.minStockIsDefault ? "default" : "set",
+      STATUS_TEXT[row.status] || row.status,
+      row.isActive ? "No" : "Yes",
+      conflictText(row) || "No",
     ]);
+  });
+  if (report.rows.length) {
+    sheet.autoFilter = {
+      from: { row: headerRow.number, column: 1 },
+      to: { row: headerRow.number + report.rows.length, column: headers.length },
+    };
+  }
+  sheet.views = [{ state: "frozen", ySplit: headerRow.number }];
 
-    res.json({
-      page,
-      totalPages: Math.ceil(totalCount / limit),
-      totalCount,
-      totalQuantity: totalQuantity[0]?.total || 0,
-      data,
-    });
-  } catch (err) {
-    console.error("StockOut report error:", err);
-    res.status(500).json({ message: err.message });
-}
-};
+  const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+  sendFile(res, buffer, currentStockFilename(report, "xlsx"));
+});
+
+exports.exportCurrentStockPDF = exportHandler("Current stock PDF export", async (req, res) => {
+  const report = await buildCurrentStockReport({ includeArchived: req.query.includeArchived === "true" });
+  const doc = new PDFDocument({ margin: 40, size: "A4", layout: "landscape", bufferPages: true });
+  const buffer = await pdfToBuffer(doc, () => {
+    drawReportHeader(doc, { title: "Current Stock Report", lines: currentStockLines(report) });
+    if (report.rows.length === 0) {
+      doc.font("Helvetica").fontSize(11).text("No products.", { align: "center" });
+    } else {
+      drawTable(doc, { columns: CURRENT_STOCK_COLUMNS, rows: report.rows });
+    }
+    addPageFooters(doc, `Current Stock Report · ${formatDate(report.generatedAt)}`);
+  });
+  sendFile(res, buffer, currentStockFilename(report, "pdf"));
+});
+
+// The paginated GET /api/export/stock-out endpoint was removed in Phase 3:
+// it was never used by the frontend, filtered on createdAt instead of the
+// movement date, ignored corrections and requested a non-existent "sku"
+// field. Use GET /api/reports/stock-out?from=&to= for JSON data instead.

@@ -30,7 +30,8 @@ export default function CurrentStockReport({ items, loaded, loading, error, onRe
 
   const exportAs = async (format) => {
     const ext = format === "pdf" ? "pdf" : "xlsx";
-    const filename = `current-stock${includeArchived ? "-with-archived" : ""}-${todayStamp()}.${ext}`;
+    // Fallback only; the server's filename is used when the browser can read it.
+    const filename = `current-stock${includeArchived ? "-with-archived" : ""}_${todayStamp()}.${ext}`;
     setExportError("");
     setExporting(format);
     try {

@@ -3,8 +3,7 @@
 // Report data is loaded once by App (shared with the dashboard stats) and
 // passed in per section, so each table loads and fails independently.
 import { useState } from "react";
-import { saveAs } from "file-saver";
-import { api } from "../api.js";
+import { downloadFile, getErrorMessage, rangeSlug } from "../api.js";
 import CurrentStockReport from "./CurrentStockReport.jsx";
 import "./reports.css";
 
@@ -84,30 +83,47 @@ export default function Reports({ sections, stock, onRetry, retrying }) {
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
-  // ====== Export Functions ======
-  const exportExcel = async (type, period) => {
+  const [exporting, setExporting] = useState("");
+
+  const formatInputDate = (value) => (value ? value.split("-").reverse().join("/") : "");
+  const periodLabel =
+    fromDate && toDate
+      ? `${formatInputDate(fromDate)} – ${formatInputDate(toDate)}`
+      : fromDate
+        ? `${formatInputDate(fromDate)} – today`
+        : toDate
+          ? `up to ${formatInputDate(toDate)}`
+          : "all dates";
+  const rangeInvalid = Boolean(fromDate && toDate && fromDate > toDate);
+
+  // ====== Export ======
+  // type: "stock-in" | "stock-out", format: "pdf" | "excel".
+  // Empty dates are allowed (all dates / open-ended); the server names the
+  // file, e.g. stock-in-report_2026-11-01_to_2026-11-25.pdf.
+  const exportReport = async (type, format) => {
+    if (rangeInvalid) return setError("The From date must be on or before the To date.");
+    const label = `${type === "stock-in" ? "Stock In" : "Stock Out"} ${format === "pdf" ? "PDF" : "Excel"}`;
+    const ext = format === "pdf" ? "pdf" : "xlsx";
+    setError("");
+    setExporting(`${type}:${format}`);
     try {
-      setError("");
-      const url = `/api/export/${type}/excel?from=${fromDate}&to=${toDate}`;
-      const res = await api.get(url, { responseType: "blob" });
-      saveAs(res.data, `${type}-${period}-report.xlsx`);
+      await downloadFile(`/api/export/${type}/${format}`, `${type}-report_${rangeSlug(fromDate, toDate)}.${ext}`, {
+        from: fromDate || undefined,
+        to: toDate || undefined,
+      });
     } catch (err) {
       console.error(err);
-      setError("Excel export failed");
+      setError(getErrorMessage(err, `${label} export failed`));
+    } finally {
+      setExporting("");
     }
   };
 
-  const exportPDF = async (type, period) => {
-    try {
-      setError("");
-      const url = `/api/export/${type}/pdf?from=${fromDate}&to=${toDate}`;
-      const res = await api.get(url, { responseType: "blob" });
-      saveAs(res.data, `${type}-${period}-report.pdf`);
-    } catch (err) {
-      console.error(err);
-      setError("PDF export failed");
-    }
-  };
+  const exportButton = (type, format) => (
+    <button onClick={() => exportReport(type, format)} disabled={Boolean(exporting) || rangeInvalid}>
+      {exporting === `${type}:${format}` ? "Exporting..." : `Export ${format === "pdf" ? "PDF" : "Excel"}`}
+    </button>
+  );
 
   return (
     <div className="reports-container">
@@ -137,18 +153,23 @@ export default function Reports({ sections, stock, onRetry, retrying }) {
           />
         </label>
       </div>
+      <p className={`export-period${rangeInvalid ? " invalid" : ""}`}>
+        {rangeInvalid
+          ? "The From date must be on or before the To date."
+          : `Exports cover ${periodLabel}. Leave both dates empty to export everything.`}
+      </p>
 
       {/* Export Buttons */}
       <div className="export-container">
         <div className="export-section">
           <span>Stock In</span>
-          <button onClick={() => exportPDF("stock-in")}>Export PDF</button>
-          <button onClick={() => exportExcel("stock-in")}>Export Excel</button>
+          {exportButton("stock-in", "pdf")}
+          {exportButton("stock-in", "excel")}
         </div>
         <div className="export-section">
           <span>Stock Out</span>
-          <button onClick={() => exportPDF("stock-out")}>Export PDF</button>
-          <button onClick={() => exportExcel("stock-out")}>Export Excel</button>
+          {exportButton("stock-out", "pdf")}
+          {exportButton("stock-out", "excel")}
         </div>
       </div>
 

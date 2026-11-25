@@ -182,6 +182,22 @@
     font-size: 0.8rem;
   }
 }
+.export-period {
+  margin: -0.2rem 0 0.8rem;
+  font-size: 0.85rem;
+  color: #596460;
+}
+
+.export-period.invalid {
+  color: #ac1e2d;
+  font-weight: 600;
+}
+
+.export-section button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .archived-tag {
   margin-left: 0.4rem;
   padding: 0.1rem 0.4rem;

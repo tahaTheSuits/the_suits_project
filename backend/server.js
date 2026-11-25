@@ -21,7 +21,9 @@ const app = express();
 // Middleware
 app.use(express.json());
 app.use(cors(
-    { origin: 'https://thesuits.netlify.app', 
+    { origin: 'https://thesuits.netlify.app',
+        // Lets the browser read export filenames from the response.
+        exposedHeaders: ['Content-Disposition'],
         //credentials: true, 
     }
 ));

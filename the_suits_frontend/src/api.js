@@ -22,10 +22,41 @@ export const todayStamp = () => {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
 
-// Downloads a backend export (PDF/Excel) under an explicit filename.
-export const downloadFile = async (path, filename, params) => {
-  const res = await api.get(path, { responseType: "blob", params });
-  saveAs(res.data, filename);
+// Filename suffix for an export period; mirrors the backend so the fallback
+// name matches the server's (e.g. "2026-11-01_to_2026-11-25", "all-dates").
+export const rangeSlug = (from, to) => {
+  if (from && to) return from === to ? from : `${from}_to_${to}`;
+  if (from) return `${from}_to_${todayStamp()}`;
+  if (to) return `until_${to}`;
+  return "all-dates";
+};
+
+const filenameFromHeaders = (headers) => {
+  const disposition = headers?.["content-disposition"] || "";
+  const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition);
+  return match ? decodeURIComponent(match[1]) : null;
+};
+
+// Downloads a backend export (PDF/Excel). Uses the server's filename when
+// the browser can read it, otherwise `fallbackFilename`. Error responses
+// arrive as Blobs; they are parsed back to JSON so the server's message
+// (e.g. "Invalid from date") can be shown instead of a generic failure.
+export const downloadFile = async (path, fallbackFilename, params) => {
+  let res;
+  try {
+    res = await api.get(path, { responseType: "blob", params });
+  } catch (err) {
+    const data = err?.response?.data;
+    if (data instanceof Blob) {
+      try {
+        err.response.data = JSON.parse(await data.text());
+      } catch {
+        err.response.data = {};
+      }
+    }
+    throw err;
+  }
+  saveAs(res.data, filenameFromHeaders(res.headers) || fallbackFilename);
 };
 
 // Prefer the server's message (e.g. "Unit mismatch ...") over a generic one.

@@ -2,6 +2,7 @@ const StockOut = require("../models/stockOutModel");
 const StockIn = require("../models/stockInModel");
 const { runMovementReport } = require("../utils/reportPipeline");
 const { getCurrentStock } = require("../utils/stock");
+const { resolveRequiredRange, ExportError } = require("../utils/exportHelpers");
 
 // Helpers
 const getDayRange = (date) => {
@@ -24,25 +25,15 @@ const getWeekRange = (date) => {
   return { start, end };
 };
 
-const getRequestedRange = (req) => {
-  const { from, to } = req.query;
-  if (!from || !to) return null;
-  const start = new Date(from);
-  const end = new Date(to);
-  if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
-  start.setHours(0, 0, 0, 0);
-  end.setHours(23, 59, 59, 999);
-  return { start, end };
-};
+// Inclusive local-day range; both dates required (YYYY-MM-DD).
+const getRequestedRange = (req) => resolveRequiredRange(req.query);
 
 const reportHandler = (Model, movementType, getRange, sort, errorMessage) => async (req, res) => {
   try {
     const range = getRange(req);
-    if (!range) {
-      return res.status(400).json({ message: "Valid from and to dates are required" });
-    }
     res.json(await runMovementReport(Model, movementType, range, sort));
   } catch (err) {
+    if (err instanceof ExportError) return res.status(err.status).json({ message: err.message });
     console.error(err);
     res.status(500).json({ message: errorMessage });
   }
@@ -53,20 +44,20 @@ const thisWeek = () => getWeekRange(new Date());
 
 // --- Stock Out Reports ---
 exports.getDailyReport = reportHandler(
-  StockOut, "out", today, { productName: 1, floor: 1, date: 1 }, "Failed to fetch daily report",
+  StockOut, "out", today, { sortName: 1, date: 1 }, "Failed to fetch daily report",
 );
 
 exports.getWeeklyReport = reportHandler(
-  StockOut, "out", thisWeek, { productName: 1, floor: 1, date: 1 }, "Failed to fetch weekly report",
+  StockOut, "out", thisWeek, { sortName: 1, date: 1 }, "Failed to fetch weekly report",
 );
 
 // --- Stock In Reports ---
 exports.getDailyStockInReport = reportHandler(
-  StockIn, "in", today, { productName: 1, date: 1 }, "Failed to fetch daily stock in report",
+  StockIn, "in", today, { sortName: 1, date: 1 }, "Failed to fetch daily stock in report",
 );
 
 exports.getWeeklyStockInReport = reportHandler(
-  StockIn, "in", thisWeek, { productName: 1, date: 1 }, "Failed to fetch weekly stock in report",
+  StockIn, "in", thisWeek, { sortName: 1, date: 1 }, "Failed to fetch weekly stock in report",
 );
 
 // --- Date range reports ---
