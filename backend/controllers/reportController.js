@@ -3,6 +3,7 @@ const StockIn = require("../models/stockInModel");
 const { runMovementReport } = require("../utils/reportPipeline");
 const { getCurrentStock } = require("../utils/stock");
 const { resolveRequiredRange, ExportError } = require("../utils/exportHelpers");
+const { buildOccupancyConsumptionReport } = require("../utils/occupancyReport");
 
 // Helpers
 const getDayRange = (date) => {
@@ -94,5 +95,19 @@ exports.getCurrentStockReport = async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Failed to fetch current stock report" });
+  }
+};
+
+
+// --- Occupancy-based consumption ---
+// GET /api/reports/occupancy-consumption?from=YYYY-MM-DD&to=YYYY-MM-DD
+// (default: last 7 business days). See utils/occupancyReport.js.
+exports.getOccupancyConsumptionReport = async (req, res) => {
+  try {
+    res.json(await buildOccupancyConsumptionReport(req.query));
+  } catch (err) {
+    if (err instanceof ExportError) return res.status(err.status).json({ message: err.message });
+    console.error(err);
+    res.status(500).json({ message: "Failed to build occupancy consumption report" });
   }
 };

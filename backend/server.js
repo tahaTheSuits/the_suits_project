@@ -12,6 +12,7 @@ const dailyReportsRoute = require('./routes/dailyReportsRoute');
 const reportExportRoute = require('./routes/reportExportRoute');
 const reportRoute = require('./routes/reportRoute');
 const adjustmentsRoute = require('./routes/adjustmentsRoute');
+const occupancyRoute = require('./routes/occupancyRoute');
 const { ensureIndexes } = require('./utils/dbMaintenance');
 
 
@@ -19,7 +20,7 @@ const app = express();
 
 
 // Middleware
-app.use(express.json());
+app.use(express.json({ limit: '1mb' }));
 app.use(cors(
     { origin: 'https://thesuits.netlify.app',
         // Lets the browser read export filenames from the response.
@@ -38,6 +39,7 @@ app.use('/api/delete', deleteRoute);
 app.use('/api/reports', reportRoute);
 app.use('/api/export', reportExportRoute);
 app.use('/api/adjustments', adjustmentsRoute);
+app.use('/api/occupancy', occupancyRoute);
 //app.use('/api/export', reportExportRoute);
 
 

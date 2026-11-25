@@ -26,6 +26,8 @@ const {
   sendFile,
   exportHandler,
 } = require("../utils/exportHelpers");
+const { buildOccupancyConsumptionReport, metricText, METRICS } = require("../utils/occupancyReport");
+const { gbDay } = require("../utils/businessDay");
 
 const HEADER_FILL = "FF5F756D";
 
@@ -243,3 +245,175 @@ exports.exportCurrentStockPDF = exportHandler("Current stock PDF export", async 
 // it was never used by the frontend, filtered on createdAt instead of the
 // movement date, ignored corrections and requested a non-existent "sku"
 // field. Use GET /api/reports/stock-out?from=&to= for JSON data instead.
+
+// ================= OCCUPANCY-BASED CONSUMPTION (PDF / EXCEL) =================
+// GET /api/export/occupancy-consumption/{pdf|excel}?from=YYYY-MM-DD&to=YYYY-MM-DD
+// Same data as GET /api/reports/occupancy-consumption.
+
+const dash = (v) => (v === null || v === undefined ? "–" : v);
+const pct = (rate) => (rate === null ? "N/A" : `${Math.round(rate * 1000) / 10}%`);
+const sourceText = (day) =>
+  !day.hasRecord ? "No record" : `${day.source === "manual" ? "Manual" : "Sync"}${day.manualOverride ? " (override)" : ""}`;
+const unitTotals = (list) => (list.length ? list.map((t) => `${t.quantity} ${t.unit}`).join(" · ") : "–");
+
+const productNotes = (row) =>
+  [
+    row.archived ? "archived product" : "",
+    row.outWithoutOccupancy > 0 ? `${row.outWithoutOccupancy} ${row.unit} on days without occupancy data` : "",
+    row.unitConflicts ? `${row.unitConflicts} movement(s) recorded in another unit` : "",
+  ]
+    .filter(Boolean)
+    .join("; ");
+
+const occupancyLines = (report) => {
+  const s = report.summary;
+  return [
+    `Period: ${report.label} · business days in ${report.timeZone}`,
+    `Occupancy data for ${s.daysWithOccupancy} of ${s.totalDays} days · service data for ${s.daysWithServicedApartments} · housekeeping data for ${s.daysWithHousekeeping}`,
+    `Occupied apartment-nights: ${dash(s.occupiedApartmentNights)} · serviced apartments: ${dash(s.servicedApartments)} · housekeeping tasks: ${dash(s.housekeepingTasks)} · average occupancy: ${pct(s.averageOccupancyRate)}`,
+    "Averages use only days that have the relevant data; quantities are in each product's own unit (corrections applied)",
+    `Generated ${formatDateTime(report.generatedAt)}`,
+  ];
+};
+
+const CONSUMPTION_COLUMNS = [
+  { header: "Product", width: 2.6, value: (r) => r.product },
+  { header: "Unit", width: 0.9, value: (r) => r.unit },
+  { header: "Total out", width: 1.1, align: "right", value: (r) => r.totalOut },
+  ...METRICS.map((m) => ({
+    header: `Per ${m.label.replace(/^per /, "")}`,
+    width: 2.1,
+    value: (r) => metricText(r[m.key], r.unit),
+  })),
+  { header: "Notes", width: 2.6, muted: true, value: productNotes },
+];
+
+const DAY_COLUMNS = [
+  { header: "Date", width: 1.2, value: (d) => gbDay(d.date) },
+  {
+    header: "Occupied / total",
+    width: 1.4,
+    value: (d) =>
+      d.occupiedApartments === null && d.totalApartments === null
+        ? "–"
+        : `${dash(d.occupiedApartments)} / ${dash(d.totalApartments)}`,
+  },
+  { header: "Vacant", width: 0.8, align: "right", value: (d) => dash(d.vacantApartments) },
+  { header: "Check-ins", width: 0.9, align: "right", value: (d) => dash(d.checkIns) },
+  { header: "Check-outs", width: 0.9, align: "right", value: (d) => dash(d.checkOuts) },
+  { header: "Serviced", width: 0.9, align: "right", value: (d) => dash(d.servicedApartments) },
+  { header: "Housekeeping", width: 1.1, align: "right", value: (d) => dash(d.housekeepingCount) },
+  { header: "Laundry", width: 0.8, align: "right", value: (d) => dash(d.laundryCount) },
+  { header: "Water", width: 0.8, align: "right", value: (d) => dash(d.waterCount) },
+  { header: "Source", width: 1.2, value: sourceText },
+  { header: "Stock out", width: 2.2, value: (d) => unitTotals(d.stockOutByUnit) },
+];
+
+exports.exportOccupancyConsumptionPDF = exportHandler("Occupancy consumption PDF export", async (req, res) => {
+  const report = await buildOccupancyConsumptionReport(req.query);
+  const title = "Consumption vs Occupancy";
+  const doc = new PDFDocument({ margin: 36, size: "A4", layout: "landscape", bufferPages: true });
+  const buffer = await pdfToBuffer(doc, () => {
+    drawReportHeader(doc, { title, lines: occupancyLines(report) });
+
+    doc.font("Helvetica-Bold").fontSize(12).text("Consumption by product");
+    doc.moveDown(0.3);
+    if (report.products.length === 0) {
+      doc.font("Helvetica").fontSize(10).text("No stock out in this period.");
+      doc.moveDown();
+    } else {
+      drawTable(doc, { columns: CONSUMPTION_COLUMNS, rows: report.products, fontSize: 8.5 });
+    }
+
+    doc.moveDown(0.5);
+    doc.font("Helvetica-Bold").fontSize(12).fillColor("#1f2926").text("Daily occupancy and service", doc.page.margins.left);
+    doc.moveDown(0.3);
+    drawTable(doc, { columns: DAY_COLUMNS, rows: report.days, fontSize: 8.5 });
+
+    addPageFooters(doc, `${title} · ${report.label}`);
+  });
+  sendFile(res, buffer, `occupancy-consumption_${report.slug}.pdf`);
+});
+
+function addStyledHeader(sheet, headers, widths) {
+  const row = sheet.addRow(headers);
+  row.font = { bold: true, color: { argb: "FFFFFFFF" } };
+  row.eachCell((cell) => {
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: HEADER_FILL } };
+  });
+  widths.forEach((w, i) => {
+    sheet.getColumn(i + 1).width = w;
+  });
+  return row;
+}
+
+exports.exportOccupancyConsumptionExcel = exportHandler("Occupancy consumption Excel export", async (req, res) => {
+  const report = await buildOccupancyConsumptionReport(req.query);
+  const workbook = new ExcelJS.Workbook();
+
+  // Sheet 1: per product. Metric cells are numbers when available, "N/A (...)" otherwise.
+  const sheet = workbook.addWorksheet("Consumption");
+  sheet.addRow(["Consumption vs Occupancy"]).font = { bold: true, size: 14 };
+  occupancyLines(report).forEach((line) => {
+    sheet.addRow([line]).font = { color: { argb: "FF596460" } };
+  });
+  Object.values(report.formulas).forEach((f) => {
+    sheet.addRow([f]).font = { italic: true, color: { argb: "FF596460" } };
+  });
+  sheet.addRow([]);
+  const metricHeaders = METRICS.flatMap((m) => [`Per ${m.label.replace(/^per /, "")}`, `Days with data (${m.label})`]);
+  const header = addStyledHeader(
+    sheet,
+    ["Product", "Unit", "Total out", "Movements", ...metricHeaders, "Out on days without occupancy", "Unit conflicts", "Archived", "Notes"],
+    [30, 9, 11, 11, ...METRICS.flatMap(() => [24, 14]), 18, 12, 10, 40],
+  );
+  report.products.forEach((r) => {
+    sheet.addRow([
+      r.product,
+      r.unit,
+      r.totalOut,
+      r.movements,
+      ...METRICS.flatMap((m) => [
+        r[m.key].value === null ? `N/A (${r[m.key].note})` : r[m.key].value,
+        `${r[m.key].daysWithData} / ${r[m.key].totalDays}`,
+      ]),
+      r.outWithoutOccupancy,
+      r.unitConflicts,
+      r.archived ? "Yes" : "No",
+      productNotes(r),
+    ]);
+  });
+  if (report.products.length === 0) sheet.addRow(["No stock out in this period."]);
+  sheet.views = [{ state: "frozen", ySplit: header.number }];
+
+  // Sheet 2: per day. Unknown values stay empty (never 0).
+  const days = workbook.addWorksheet("Daily occupancy");
+  const dayHeader = addStyledHeader(
+    days,
+    ["Date", "Total apartments", "Occupied", "Vacant", "Check-ins", "Check-outs", "Serviced", "Housekeeping", "Laundry", "Water", "Source", "Note", "Stock out (by unit)"],
+    [12, 16, 10, 9, 10, 11, 10, 13, 9, 8, 16, 30, 30],
+  );
+  report.days.forEach((d) => {
+    const [y, m, dd] = d.date.split("-").map(Number);
+    const row = days.addRow([
+      new Date(Date.UTC(y, m - 1, dd)),
+      d.totalApartments,
+      d.occupiedApartments,
+      d.vacantApartments,
+      d.checkIns,
+      d.checkOuts,
+      d.servicedApartments,
+      d.housekeepingCount,
+      d.laundryCount,
+      d.waterCount,
+      sourceText(d),
+      d.note,
+      unitTotals(d.stockOutByUnit),
+    ]);
+    row.getCell(1).numFmt = "dd/mm/yyyy";
+  });
+  days.views = [{ state: "frozen", ySplit: dayHeader.number }];
+
+  const buffer = Buffer.from(await workbook.xlsx.writeBuffer());
+  sendFile(res, buffer, `occupancy-consumption_${report.slug}.xlsx`);
+});

@@ -3,6 +3,7 @@ const Product = require("../models/productModel");
 const StockIn = require("../models/stockInModel");
 const StockOut = require("../models/stockOutModel");
 const Adjustment = require("../models/adjustmentModel");
+const Occupancy = require("../models/occupancyModel");
 
 // The original schema had `name: { unique: true }`, which created a global
 // unique index "name_1". That index blocks reusing an archived product's
@@ -34,10 +35,11 @@ async function ensureIndexes() {
     StockIn.createIndexes(),
     StockOut.createIndexes(),
     Adjustment.createIndexes(),
+    Occupancy.createIndexes(),
   ]);
   results.forEach((result, i) => {
     if (result.status === "rejected") {
-      const model = ["Product", "StockIn", "StockOut", "Adjustment"][i];
+      const model = ["Product", "StockIn", "StockOut", "Adjustment", "Occupancy"][i];
       console.error(`[db] Index build failed for ${model}:`, result.reason?.message || result.reason);
     }
   });

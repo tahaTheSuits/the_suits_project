@@ -5,6 +5,7 @@
 import { useState } from "react";
 import { downloadFile, getErrorMessage, rangeSlug } from "../api.js";
 import CurrentStockReport from "./CurrentStockReport.jsx";
+import OccupancyPanel from "./OccupancyPanel.jsx";
 import "./reports.css";
 
 const SECTIONS = [
@@ -129,6 +130,7 @@ export default function Reports({ sections, stock, onRetry, retrying }) {
     <div className="reports-container">
       <h1 className="reports-title">Reports Dashboard</h1>
       <CurrentStockReport {...stock} onRetry={onRetry} />
+      <OccupancyPanel />
 
       {error && <p className="reports-error">{error}</p>}
 

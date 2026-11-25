@@ -9,7 +9,10 @@ const {
     getStockOutByDateRange,
     getStockInByDateRange,
     getCurrentStockReport,
+    getOccupancyConsumptionReport,
 } = require("../controllers/reportController");
+
+router.get("/occupancy-consumption", getOccupancyConsumptionReport);
 
 router.get("/current-stock", getCurrentStockReport);
 

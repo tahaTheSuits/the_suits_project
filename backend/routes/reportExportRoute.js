@@ -7,7 +7,12 @@ const {
     exportStockInPDF,
     exportCurrentStockExcel,
     exportCurrentStockPDF,
+    exportOccupancyConsumptionExcel,
+    exportOccupancyConsumptionPDF,
 } = require("../controllers/reportExportController");
+
+router.get("/occupancy-consumption/excel", exportOccupancyConsumptionExcel);
+router.get("/occupancy-consumption/pdf", exportOccupancyConsumptionPDF);
 
 router.get("/current-stock/excel", exportCurrentStockExcel);
 router.get("/current-stock/pdf", exportCurrentStockPDF);
