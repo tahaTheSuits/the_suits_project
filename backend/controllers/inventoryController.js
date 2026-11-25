@@ -1,39 +1,39 @@
-const mongoose = require("mongoose");
 const Product = require("../models/productModel");
-const StockIn = require("../models/stockInModel");
-const StockOut = require("../models/stockOutModel");
+const {
+  computeLedger,
+  effectiveMinStock,
+  stockStatus,
+  productUnitOf,
+} = require("../utils/stock");
 
 // Get Inventory
+// GET /api/inventory                       -> active products only
+// GET /api/inventory?includeArchived=true  -> active + archived products
 exports.getInventory = async (req, res) => {
   try {
-    const [products, stockInTotals, stockOutTotals] = await Promise.all([
-      Product.find(),
-      StockIn.aggregate([
-        { $group: { _id: "$product", totalIn: { $sum: "$quantity" } } },
-      ]),
-      StockOut.aggregate([
-        { $group: { _id: "$product", totalOut: { $sum: "$quantity" } } },
-      ]),
-    ]);
+    const includeArchived = req.query.includeArchived === "true";
+    const filter = includeArchived ? {} : { isActive: { $ne: false } };
 
-    const stockInMap = new Map(
-      stockInTotals.map((entry) => [String(entry._id), Number(entry.totalIn) || 0]),
-    );
-    const stockOutMap = new Map(
-      stockOutTotals.map((entry) => [String(entry._id), Number(entry.totalOut) || 0]),
-    );
+    const products = await Product.find(filter).sort({ name: 1 }).lean();
+    const ledger = await computeLedger(products);
 
     const inventory = products.map((product) => {
-      const productId = String(product._id);
-      const totalIn = stockInMap.get(productId) || 0;
-      const totalOut = stockOutMap.get(productId) || 0;
+      const totals = ledger.get(String(product._id));
+      const minStock = effectiveMinStock(product.minStock);
 
       return {
         _id: product._id,
         product: product.name,
-        quantity: totalIn - totalOut,
-        unit: product.unit,
-        minStock: product.minStock,
+        quantity: totals.quantity,
+        totalIn: totals.totalIn,
+        totalOut: totals.totalOut,
+        unit: productUnitOf(product),
+        minStock: minStock.value,
+        minStockIsDefault: minStock.isDefault,
+        status: stockStatus(totals.quantity, minStock.value),
+        isActive: product.isActive !== false,
+        archivedAt: product.archivedAt || null,
+        unitConflicts: totals.unitConflicts,
       };
     });
 

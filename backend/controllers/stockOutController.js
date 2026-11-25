@@ -1,80 +1,62 @@
 // controllers/stockOutController.js
 const StockOut = require("../models/stockOutModel");
-const StockIn = require("../models/stockInModel");
-const Product = require("../models/productModel");
-const mongoose = require("mongoose");
+const { resolveMovementInput, MovementError } = require("../utils/movements");
+const { availableFor, syncQuantityCache } = require("../utils/stock");
 
 // Stock Out
 exports.createStockOut = async (req, res) => {
   try {
-    const { productId, quantity, unit } = req.body;
-    const qty = Number(quantity);
-    const normalizedUnit = unit === "galon" ? "gallon" : unit;
+    const { productId, quantity, unit, note } = req.body;
 
-    if (!productId) {
-      return res.status(400).json({ message: "productId is required." });
-    }
+    const { product, qty, unit: productUnit } = await resolveMovementInput({
+      productId,
+      quantity,
+      unit,
+    });
 
-    if (!Number.isFinite(qty) || qty <= 0) {
-      return res.status(400).json({ message: "quantity must be a positive number." });
-    }
-
-    if (!mongoose.Types.ObjectId.isValid(productId)) {
-      return res.status(400).json({ message: "Invalid productId." });
-    }
-
-    const product = await Product.findById(productId);
-    if (!product) {
-      return res.status(404).json({ message: "Product not found." });
-    }
-
-    const productObjectId = new mongoose.Types.ObjectId(productId);
-    const [totalInAgg, totalOutAgg] = await Promise.all([
-      StockIn.aggregate([
-        { $match: { product: productObjectId } },
-        { $group: { _id: "$product", totalIn: { $sum: "$quantity" } } },
-      ]),
-      StockOut.aggregate([
-        { $match: { product: productObjectId } },
-        { $group: { _id: "$product", totalOut: { $sum: "$quantity" } } },
-      ]),
-    ]);
-
-    const totalIn = totalInAgg[0]?.totalIn || 0;
-    const totalOut = totalOutAgg[0]?.totalOut || 0;
-    const available = totalIn - totalOut;
-
+    const available = await availableFor(product);
     if (qty > available) {
       return res.status(400).json({
-        message: `Insufficient stock. Available quantity is ${available}.`,
+        message: `Insufficient stock. Available quantity is ${available} ${productUnit}.`,
       });
     }
 
-    const stockOut = new StockOut({
-      product: productObjectId,
+    const stockOut = await StockOut.create({
+      product: product._id,
       quantity: qty,
       date: new Date(),
-      unit: normalizedUnit || product.unit || "pcs",
+      unit: productUnit,
+      note: note || "",
     });
 
-    await stockOut.save();
+    // Guard against two concurrent stock-outs both passing the check above:
+    // if the ledger went negative, roll back only the record just created.
+    const after = await availableFor(product);
+    if (after < 0) {
+      await StockOut.deleteOne({ _id: stockOut._id });
+      await syncQuantityCache(product);
+      return res.status(409).json({
+        message: "Stock changed while saving (another stock out was recorded). Please try again.",
+      });
+    }
 
-    // keep product.quantity in sync with current aggregate-based inventory
-    product.quantity = available - qty;
-    await product.save();
+    const remainingQuantity = await syncQuantityCache(product);
 
     res.status(201).json({
       success: true,
       message: "Stock out recorded successfully.",
       data: {
         stockOutId: stockOut._id,
-        productId,
+        productId: String(product._id),
         quantity: qty,
         unit: stockOut.unit,
-        remainingQuantity: available - qty,
+        remainingQuantity,
       },
     });
   } catch (err) {
+    if (err instanceof MovementError) {
+      return res.status(err.status).json({ message: err.message });
+    }
     console.error(err);
     res.status(500).json({ message: "Failed to create stock out." });
   }

@@ -175,3 +175,12 @@
     font-size: 0.8rem;
   }
 }
+.archived-tag {
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: #e4e6e1;
+  color: #596460;
+  font-size: 0.7rem;
+  font-weight: 600;
+}

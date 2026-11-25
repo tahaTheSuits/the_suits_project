@@ -1,33 +1,38 @@
-const mongoose = require("mongoose");
 const StockIn = require("../models/stockInModel");
-const Product = require("../models/productModel");
+const { resolveMovementInput, MovementError } = require("../utils/movements");
+const { syncQuantityCache } = require("../utils/stock");
 
 // Stock In
 exports.addStockIn = async (req, res) => {
   try {
-    const { product, quantity, source, note, unit } = req.body;
+    const { product: productId, quantity, source, note, unit } = req.body;
 
-    // ✅ التحقق من البيانات المطلوبة
-    if (!product || !quantity) {
-      return res.status(400).json({ message: "Product and quantity required" });
-    }
+    // ✅ التحقق من البيانات المطلوبة (product exists, active, unit matches)
+    const { product, qty, unit: productUnit } = await resolveMovementInput({
+      productId,
+      quantity,
+      unit,
+    });
 
     // ⿡ إنشاء سجل Stock In
     const entry = await StockIn.create({
-      product: new mongoose.Types.ObjectId(product),
-      quantity: Number(quantity),
+      product: product._id,
+      quantity: qty,
       source: source || "Unknown", // لو ما حط المستخدم مصدر
       note: note || "",
       date: new Date(),
-      unit: unit || "pcs", // لو ما حط المستخدم unit، خليها pcs
+      unit: productUnit,
     });
 
-    // ⿢ تحديث كمية المنتج الفعلية
-    await Product.findByIdAndUpdate(product, { $inc: { quantity: Number(quantity) } });
+    // ⿢ تحديث الكمية المخزنة من السجل (ledger is the source of truth)
+    const remainingQuantity = await syncQuantityCache(product);
 
-    res.status(201).json(entry);
+    res.status(201).json({ ...entry.toObject(), remainingQuantity });
   } catch (err) {
+    if (err instanceof MovementError) {
+      return res.status(err.status).json({ message: err.message });
+    }
     console.error("stockIn error:", err);
     res.status(500).json({ message: err.message });
-}
+  }
 };

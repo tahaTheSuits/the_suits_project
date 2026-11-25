@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const { unitField } = require("../utils/units");
 
 const stockInSchema = new mongoose.Schema(
   {
@@ -20,14 +21,15 @@ const stockInSchema = new mongoose.Schema(
       type: Date,
       default: Date.now
     },
-    unit: {
-      type: String,
-      enum: ["pcs", "galon", "bag"],
-      default: "pcs"
-    },
+    unit: unitField,
     note: String
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model("StockIn",stockInSchema);
+// Ledger totals per product, and date-range reports.
+stockInSchema.index({ product: 1, date: 1 });
+stockInSchema.index({ date: 1 });
+stockInSchema.index({ createdAt: 1 });
+
+module.exports = mongoose.model("StockIn", stockInSchema);

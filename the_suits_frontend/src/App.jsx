@@ -1,223 +1,270 @@
 // src/App.jsx
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { setInventory } from "./features/inventory/inventorySlice.js";
-import axios from "axios";
+import { api, UNITS, getErrorMessage, isCanceled } from "./api.js";
 import Reports from "./components/reports.jsx";
 import logo from "./assets/logo2.png";
 import "./App.css";
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "https://the-suits-project.onrender.com";
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 20000,
-});
+// Every endpoint is requested exactly once per load (the dashboard stats are
+// derived from the daily reports instead of fetching them a second time).
+const REPORT_ENDPOINTS = {
+  dailyOut: "/api/reports/stock-out/daily",
+  weeklyOut: "/api/reports/stock-out/weekly",
+  dailyIn: "/api/reports/stock-in/daily",
+  weeklyIn: "/api/reports/stock-in/weekly",
+};
+const REPORT_KEYS = Object.keys(REPORT_ENDPOINTS);
+
+const initialSection = { data: [], loading: true, error: "", loaded: false };
+const initialReports = () =>
+  Object.fromEntries(REPORT_KEYS.map((key) => [key, initialSection]));
+
+const STATUS_LABELS = {
+  out: { label: "Out of Stock", className: "low" },
+  low: { label: "Low Stock", className: "warn" },
+  ok: { label: "In Stock", className: "ok" },
+};
+
+// "12 pcs · 3 gallon" — quantities in different units are never added together.
+const formatTotalsByUnit = (rows) => {
+  const totals = new Map();
+  rows.forEach((row) => {
+    const unit = row.unit || "pcs";
+    totals.set(unit, (totals.get(unit) || 0) + (Number(row.quantity) || 0));
+  });
+  if (totals.size === 0) return "0";
+  return [...totals.entries()].map(([unit, qty]) => `${qty} ${unit}`).join(" · ");
+};
+
+const describeConflicts = (conflicts) =>
+  conflicts
+    .map((c) => `${c.count} stock ${c.direction} (${c.quantity} ${c.unit})`)
+    .join(", ");
 
 function App() {
   const dispatch = useDispatch();
   const items = useSelector((state) => state.inventory.items || []);
   const [message, setMessage] = useState("");
-  const [reportsRefreshKey, setReportsRefreshKey] = useState(0);
-  const [stats, setStats] = useState({
-    totalProducts: 0,
-    lowStockItems: 0,
-    stockInToday: 0,
-    stockOutToday: 0,
-  });
 
-  const [stockOutUnit, setStockOutUnit] = useState("pcs");
-  const [inventoryLoading, setInventoryLoading] = useState(true);
-  const [reportsReady, setReportsReady] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [inventoryState, setInventoryState] = useState(initialSection);
+  const [reports, setReports] = useState(initialReports);
+  const [submitting, setSubmitting] = useState("");
 
   // Stock in/out fields
   const [stockInProduct, setStockInProduct] = useState("");
   const [stockInQty, setStockInQty] = useState("");
   const [stockOutProduct, setStockOutProduct] = useState("");
   const [stockOutQty, setStockOutQty] = useState("");
-  // const [usedBy, setUsedBy] = useState("");
-  // const [floor, setFloor] = useState("");
 
   // New product
   const [newProductName, setNewProductName] = useState("");
   const [newProductQty, setNewProductQty] = useState("");
   const [newProductMinStock, setNewProductMinStock] = useState("");
+  const [newProductUnit, setNewProductUnit] = useState("pcs");
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [showArchived, setShowArchived] = useState(false);
 
-  const [newProductUnit, setNewProductUnit] = useState("pcs");
-  const [stockInUnit, setStockInUnit] = useState("pcs");
+  // Only the latest load may write state; older/aborted responses are ignored.
+  const loadSeqRef = useRef(0);
+  const abortRef = useRef(null);
 
-  // Fetch Inventory
-  const fetchInventory = async () => {
-    try {
-      setInventoryLoading(true);
-      const res = await api.get("/api/inventory");
-      dispatch(setInventory(res.data || []));
-    } catch (err) {
-      console.error(err);
-      setMessage("Error fetching inventory");
-    } finally {
-      setInventoryLoading(false);
-    }
-  };
+  const loadData = useCallback(async () => {
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const seq = ++loadSeqRef.current;
 
-  const fetchDashboardStats = async () => {
-    try {
-      const [stockInDailyRes, stockOutDailyRes] = await Promise.all([
-        api.get("/api/reports/stock-in/daily"),
-        api.get("/api/reports/stock-out/daily"),
-      ]);
+    setInventoryState((prev) => ({ ...prev, loading: true }));
+    setReports((prev) =>
+      Object.fromEntries(REPORT_KEYS.map((key) => [key, { ...prev[key], loading: true }])),
+    );
 
-      const stockInToday = (stockInDailyRes.data || []).reduce(
-        (sum, entry) => sum + (Number(entry.quantity) || 0),
-        0,
-      );
-      const stockOutToday = (stockOutDailyRes.data || []).reduce(
-        (sum, entry) => sum + (Number(entry.quantity) || 0),
-        0,
-      );
+    const config = { signal: controller.signal };
+    const [inventoryResult, ...reportResults] = await Promise.allSettled([
+      api.get("/api/inventory", { ...config, params: { includeArchived: true } }),
+      ...REPORT_KEYS.map((key) => api.get(REPORT_ENDPOINTS[key], config)),
+    ]);
 
-      setStats((prev) => ({
+    if (seq !== loadSeqRef.current) return;
+
+    // Each section succeeds or fails on its own; a failure keeps the last
+    // good data on screen and shows an error for that section only.
+    if (inventoryResult.status === "fulfilled") {
+      const data = inventoryResult.value.data;
+      dispatch(setInventory(Array.isArray(data) ? data : []));
+      setInventoryState({ data: [], loading: false, error: "", loaded: true });
+    } else if (!isCanceled(inventoryResult.reason)) {
+      console.error(inventoryResult.reason);
+      setInventoryState((prev) => ({
         ...prev,
-        stockInToday,
-        stockOutToday,
+        loading: false,
+        error: getErrorMessage(inventoryResult.reason, "Error fetching inventory"),
       }));
-    } catch (err) {
-      console.error(err);
     }
-  };
 
-  const refreshAll = async ({ prioritizeInventory = false } = {}) => {
-    setIsRefreshing(true);
-    try {
-      await fetchInventory();
-
-      if (prioritizeInventory) {
-        setReportsReady(true);
-      }
-
-      await fetchDashboardStats();
-      setReportsRefreshKey((prev) => prev + 1);
-      setMessage("");
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
-  useEffect(() => {
-    const lowStockItems = items.filter(
-      (item) => Number(item.quantity) === 0,
-    ).length;
-
-    setStats((prev) => ({
-      ...prev,
-      totalProducts: items.length,
-      lowStockItems,
-    }));
-  }, [items]);
-
-  // const fetchItems = async () => {
-  //   setLoading(true);
-  //   const res = await fetch(...);
-  //   const data = await res.json();
-  //   setItems(data);
-  //   setLoading(false)
-  // }
+    setReports((prev) => {
+      const next = { ...prev };
+      REPORT_KEYS.forEach((key, i) => {
+        const result = reportResults[i];
+        if (result.status === "fulfilled") {
+          const data = result.value.data;
+          next[key] = { data: Array.isArray(data) ? data : [], loading: false, error: "", loaded: true };
+        } else if (!isCanceled(result.reason)) {
+          console.error(result.reason);
+          next[key] = {
+            ...prev[key],
+            loading: false,
+            error: getErrorMessage(result.reason, "Failed to load this report"),
+          };
+        }
+      });
+      return next;
+    });
+  }, [dispatch]);
 
   useEffect(() => {
     document.title = "The Suites Warehouse";
+    loadData();
+    return () => abortRef.current?.abort();
+  }, [loadData]);
 
-    const bootstrap = async () => {
-      await refreshAll({ prioritizeInventory: true });
+  const activeItems = useMemo(() => items.filter((item) => item.isActive !== false), [items]);
+  const archivedCount = items.length - activeItems.length;
+
+  const stats = useMemo(() => {
+    const daily = (section) =>
+      section.loaded ? formatTotalsByUnit(section.data) : section.error ? "—" : "…";
+    return {
+      totalProducts: activeItems.length,
+      lowStockItems: activeItems.filter((item) => item.status === "low" || item.status === "out").length,
+      stockInToday: daily(reports.dailyIn),
+      stockOutToday: daily(reports.dailyOut),
     };
+  }, [activeItems, reports.dailyIn, reports.dailyOut]);
 
-    bootstrap();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const isLoading = inventoryState.loading || REPORT_KEYS.some((key) => reports[key].loading);
+
+  const runMutation = async (key, request, successMessage, fallbackError) => {
+    if (submitting) return false;
+    setSubmitting(key);
+    try {
+      await request();
+      await loadData();
+      setMessage(successMessage);
+      return true;
+    } catch (err) {
+      console.error(err);
+      setMessage(getErrorMessage(err, fallbackError));
+      return false;
+    } finally {
+      setSubmitting("");
+    }
+  };
 
   // Add Product
   const handleAddNewProduct = async () => {
     if (!newProductName.trim()) return setMessage("Enter product name");
-    try {
-      await api.post("/api/products", {
-        name: newProductName,
-        minStock: Number(newProductMinStock) || 5,
-        initialQty: Number(newProductQty) || 0,
-        unit: newProductUnit,
-      });
+    const ok = await runMutation(
+      "add",
+      () =>
+        api.post("/api/products", {
+          name: newProductName.trim(),
+          // Empty -> server default (5)
+          minStock: newProductMinStock === "" ? undefined : Number(newProductMinStock),
+          initialQty: Number(newProductQty) || 0,
+          unit: newProductUnit,
+        }),
+      "Product added successfully!",
+      "Failed to add product",
+    );
+    if (ok) {
       setNewProductName("");
       setNewProductMinStock("");
       setNewProductQty("");
-      await refreshAll();
-      setMessage("Product added successfully!");
-    } catch (err) {
-      console.error(err);
-      setMessage("Failed to add product");
     }
   };
 
-  // Stock In
+  const stockInItem = activeItems.find((item) => item._id === stockInProduct);
+  const stockOutItem = activeItems.find((item) => item._id === stockOutProduct);
+
+  // Stock In — always recorded in the product's own unit
   const handleStockIn = async () => {
-    if (!stockInProduct || !stockInQty)
-      return setMessage("Select product & quantity");
-    try {
-      await api.post("/api/stock-in", {
-        product: stockInProduct,
-        quantity: Number(stockInQty),
-        source: "Main Hotel",
-        unit: stockInUnit,
-      });
+    if (!stockInItem || !stockInQty) return setMessage("Select product & quantity");
+    const ok = await runMutation(
+      "in",
+      () =>
+        api.post("/api/stock-in", {
+          product: stockInItem._id,
+          quantity: Number(stockInQty),
+          source: "Main Hotel",
+          unit: stockInItem.unit,
+        }),
+      "Stock In successful!",
+      "Stock In failed",
+    );
+    if (ok) {
       setStockInProduct("");
       setStockInQty("");
-      await refreshAll();
-      setMessage("Stock In successful!");
-    } catch (err) {
-      console.error(err);
-      setMessage("Stock In failed");
     }
   };
 
-  // Stock Out
+  // Stock Out — always recorded in the product's own unit
   const handleStockOut = async () => {
-    if (!stockOutProduct || !stockOutQty)
-      // || !usedBy || !floor
-      return setMessage("Fill all Stock Out fields");
-    try {
-      await api.post("/api/stock-out", {
-        productId: stockOutProduct,
-        quantity: Number(stockOutQty),
-        unit: stockOutUnit,
-      });
+    if (!stockOutItem || !stockOutQty) return setMessage("Fill all Stock Out fields");
+    const ok = await runMutation(
+      "out",
+      () =>
+        api.post("/api/stock-out", {
+          productId: stockOutItem._id,
+          quantity: Number(stockOutQty),
+          unit: stockOutItem.unit,
+        }),
+      "Stock Out successful!",
+      "Stock Out failed",
+    );
+    if (ok) {
       setStockOutProduct("");
       setStockOutQty("");
-      setStockOutUnit("pcs");
-      // setUsedBy("");
-      // setFloor("");
-      await refreshAll();
-      setMessage("Stock Out successful!");
-    } catch (err) {
-      console.error(err);
-      setMessage("Stock Out failed");
     }
   };
 
-  const handleDeleteProduct = async (id) => {
-    if (!id) return setMessage("No product ID");
-    try {
-      await api.delete(`/api/delete/${id}`);
-      await refreshAll();
-      setMessage("Product deleted successfully!");
-    } catch (err) {
-      console.error(err);
-      setMessage("Delete failed");
-    }
+  const handleArchiveProduct = async (item) => {
+    if (!item?._id) return setMessage("No product ID");
+    const confirmed = window.confirm(
+      `Archive "${item.product}"?\n\n` +
+        "It will be hidden from the inventory and the Stock In / Stock Out lists. " +
+        "Its past movements stay in all reports, and you can restore it later.",
+    );
+    if (!confirmed) return;
+    await runMutation(
+      `archive:${item._id}`,
+      () => api.patch(`/api/products/${item._id}/archive`),
+      `"${item.product}" archived. Its history is kept.`,
+      "Archive failed",
+    );
   };
 
-  const filteredItems = items.filter((item) =>
-    item.product.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
+  const handleRestoreProduct = async (item) => {
+    await runMutation(
+      `restore:${item._id}`,
+      () => api.patch(`/api/products/${item._id}/restore`),
+      `"${item.product}" restored.`,
+      "Restore failed",
+    );
+  };
+
+  const visibleItems = items
+    .filter((item) => showArchived || item.isActive !== false)
+    .filter((item) => item.product.toLowerCase().includes(searchTerm.toLowerCase()))
+    .sort((a, b) => {
+      // Active before archived, out-of-stock items at the bottom of each group.
+      const archived = Number(a.isActive === false) - Number(b.isActive === false);
+      if (archived !== 0) return archived;
+      return Number(a.status === "out") - Number(b.status === "out");
+    });
 
   return (
     <div className="container">
@@ -233,11 +280,11 @@ function App() {
       </section>
 
       <button
-        onClick={() => refreshAll()}
+        onClick={() => loadData()}
         className="btn btn-primary refresh-btn"
-        disabled={isRefreshing}
+        disabled={isLoading}
       >
-        {isRefreshing ? "Refreshing..." : "Refresh Data"}
+        {isLoading ? "Refreshing..." : "Refresh Data"}
       </button>
 
       <section className="stats-grid">
@@ -246,7 +293,7 @@ function App() {
           <h3 className="stat-value">{stats.totalProducts}</h3>
         </article>
         <article className="stat-card stat-low">
-          <p className="stat-label">Low Stock Items</p>
+          <p className="stat-label">Low / Out of Stock</p>
           <h3 className="stat-value">{stats.lowStockItems}</h3>
         </article>
         <article className="stat-card stat-in">
@@ -273,6 +320,7 @@ function App() {
             <input
               className="input"
               type="number"
+              min="0"
               placeholder="Initial Qty"
               value={newProductQty}
               onChange={(e) => setNewProductQty(e.target.value)}
@@ -281,28 +329,30 @@ function App() {
             <select
               value={newProductUnit}
               onChange={(e) => setNewProductUnit(e.target.value)}
-              placeholder="Unit (pcs, galon, bag)"
+              aria-label="Unit"
             >
-              <option value="pcs">pcs</option>
-              <option value="galon">galon</option>
-              <option value="bag">bag</option>
+              {UNITS.map((unit) => (
+                <option key={unit} value={unit}>{unit}</option>
+              ))}
             </select>
 
-            {/* <input
+            <input
               className="input"
               type="number"
-              placeholder="Min Stock"
+              min="0"
+              placeholder="Min Stock (default 5)"
               value={newProductMinStock}
               onChange={(e) => setNewProductMinStock(e.target.value)}
-            /> */}
+            />
           </div>
           <div className="card-actions">
             <button
               onClick={handleAddNewProduct}
               className="btn btn-primary"
               style={{ width: "140px" }}
+              disabled={Boolean(submitting)}
             >
-              Add Product
+              {submitting === "add" ? "Adding..." : "Add Product"}
             </button>
           </div>
         </div>
@@ -316,9 +366,9 @@ function App() {
               onChange={(e) => setStockInProduct(e.target.value)}
             >
               <option value="">Select Product</option>
-              {items.map((item) => (
+              {activeItems.map((item) => (
                 <option key={item._id} value={item._id}>
-                  {item.product} {item.unit}
+                  {item.product} ({item.unit})
                 </option>
               ))}
             </select>
@@ -326,27 +376,24 @@ function App() {
             <input
               className="input"
               type="number"
+              min="1"
               placeholder="Quantity"
               value={stockInQty}
               onChange={(e) => setStockInQty(e.target.value)}
             />
 
-            <select
-              value={stockInUnit}
-              onChange={(e) => setStockInUnit(e.target.value)}
-            >
-              <option value="pcs">pcs</option>
-              <option value="galon">galon</option>
-              <option value="bag">bag</option>
-            </select>
+            <span className="unit-tag" title="Movements are recorded in the product's unit">
+              {stockInItem ? stockInItem.unit : "unit"}
+            </span>
           </div>
           <div className="card-actions">
             <button
               onClick={handleStockIn}
               className="btn btn-primary"
               style={{ width: "100px" }}
+              disabled={Boolean(submitting)}
             >
-              Add
+              {submitting === "in" ? "Adding..." : "Add"}
             </button>
           </div>
         </div>
@@ -360,9 +407,9 @@ function App() {
               onChange={(e) => setStockOutProduct(e.target.value)}
             >
               <option value="">Select Product</option>
-              {items.map((item) => (
+              {activeItems.map((item) => (
                 <option key={item._id} value={item._id}>
-                  {item.product} {item.unit}
+                  {item.product} ({item.unit})
                 </option>
               ))}
             </select>
@@ -370,44 +417,29 @@ function App() {
             <input
               className="input"
               type="number"
+              min="1"
               placeholder="Quantity"
               value={stockOutQty}
               onChange={(e) => setStockOutQty(e.target.value)}
             />
 
-            <select
-              style={{
-                padding: "8px",
-                borderRadius: "8px",
-                outline: "none",
-                marginRight: "1.2rem",
-                marginBlock: "5px",
-              }}
-              value={stockOutUnit}
-              onChange={(e) => setStockOutUnit(e.target.value)}
-            >
-              <option value="pcs">pcs</option>
-              <option value="gallon">gallon</option>
-              <option value="bag">bag</option>
-            </select>
-
-            {/* <input
-              className="input"
-              placeholder="Floor"
-              value={floor}
-              onChange={(e) => setFloor(e.target.value)}
-            /> */}
-
-            {/* <input
-              className="input"
-              placeholder="Used By"
-              value={usedBy}
-              onChange={(e) => setUsedBy(e.target.value)}
-            /> */}
+            <span className="unit-tag" title="Movements are recorded in the product's unit">
+              {stockOutItem ? stockOutItem.unit : "unit"}
+            </span>
           </div>
+          {stockOutItem && (
+            <p className="field-hint">
+              Available: {stockOutItem.quantity} {stockOutItem.unit}
+            </p>
+          )}
           <div className="card-actions">
-            <button onClick={handleStockOut} className="btn btn-danger" style={{ width: "110px" }}>
-              Remove
+            <button
+              onClick={handleStockOut}
+              className="btn btn-danger"
+              style={{ width: "110px" }}
+              disabled={Boolean(submitting)}
+            >
+              {submitting === "out" ? "Saving..." : "Remove"}
             </button>
           </div>
         </div>
@@ -429,10 +461,33 @@ function App() {
         </div>
       </div>
 
-      <h2 className="inventory-title">Current Inventory</h2>
+      <div className="inventory-header">
+        <h2 className="inventory-title">Current Inventory</h2>
+        <label className="archived-toggle">
+          <input
+            type="checkbox"
+            checked={showArchived}
+            onChange={(e) => setShowArchived(e.target.checked)}
+          />
+          Show archived ({archivedCount})
+        </label>
+      </div>
+
+      {inventoryState.error && (
+        <p className="section-error">
+          {inventoryState.error}
+          {inventoryState.loaded && " — showing the last loaded data."}{" "}
+          <button className="link-btn" onClick={() => loadData()} disabled={isLoading}>
+            Retry
+          </button>
+        </p>
+      )}
+
       <div className="inventory-table-wrapper">
-        {inventoryLoading ? (
-          <p className="loading-state">Loading inventory...</p>
+        {!inventoryState.loaded ? (
+          <p className="loading-state">
+            {inventoryState.loading ? "Loading inventory..." : "Inventory is unavailable."}
+          </p>
         ) : (
           <table className="inventory-table">
             <thead>
@@ -440,49 +495,73 @@ function App() {
                 <th>Product</th>
                 <th>Quantity</th>
                 <th>Unit</th>
+                <th>Min</th>
                 <th>Status</th>
                 <th>Action</th>
               </tr>
             </thead>
 
             <tbody>
-              {[...filteredItems]
-                .sort((a, b) => {
-                  const aLow = Number(a.quantity) === 0;
-                  const bLow = Number(b.quantity) === 0;
-                  return aLow - bLow;
-                })
-                .map((item) => {
-                  const isLowStock = Number(item.quantity) === 0;
+              {visibleItems.map((item) => {
+                const archived = item.isActive === false;
+                const status = STATUS_LABELS[item.status] || STATUS_LABELS.ok;
+                const busy = submitting === `archive:${item._id}` || submitting === `restore:${item._id}`;
 
-                  return (
-                    <tr key={item._id}>
-                      <td data-label="product">{item.product}</td>
-                      <td data-label="quantity">{item.quantity}</td>
-                      <td data-label="unit">{item.unit}</td>
-
-                      <td data-label="status">
-                        <span className={`status-pill ${isLowStock ? "low" : "ok"}`}>
-                          {isLowStock ? "Low Stock" : "In Stock"}
+                return (
+                  <tr key={item._id} className={archived ? "archived-row" : undefined}>
+                    <td data-label="product">
+                      {item.product}
+                      {item.unitConflicts?.length > 0 && (
+                        <span
+                          className="unit-warning"
+                          title="These movements were recorded in a different unit than the product. They are included in the quantity — please review them."
+                        >
+                          ⚠ other units: {describeConflicts(item.unitConflicts)}
                         </span>
-                      </td>
+                      )}
+                    </td>
+                    <td data-label="quantity">{item.quantity}</td>
+                    <td data-label="unit">{item.unit}</td>
+                    <td data-label="min">
+                      {item.minStock}
+                      {item.minStockIsDefault && <span className="muted"> (default)</span>}
+                    </td>
 
-                      <td data-label="action">
+                    <td data-label="status">
+                      {archived ? (
+                        <span className="status-pill archived">Archived</span>
+                      ) : (
+                        <span className={`status-pill ${status.className}`}>{status.label}</span>
+                      )}
+                    </td>
+
+                    <td data-label="action">
+                      {archived ? (
+                        <button
+                          className="restore-btn"
+                          onClick={() => handleRestoreProduct(item)}
+                          disabled={Boolean(submitting)}
+                        >
+                          {busy ? "Restoring..." : "Restore"}
+                        </button>
+                      ) : (
                         <button
                           className="delete-btn"
-                          onClick={() => handleDeleteProduct(item._id)}
+                          onClick={() => handleArchiveProduct(item)}
+                          disabled={Boolean(submitting)}
                         >
-                          Delete
+                          {busy ? "Archiving..." : "Archive"}
                         </button>
-                      </td>
-                    </tr>
-                  );
-                })}
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
       </div>
-      <Reports refreshKey={reportsRefreshKey} enabled={reportsReady} />
+      <Reports sections={reports} onRetry={loadData} retrying={isLoading} />
     </div>
   );
 }

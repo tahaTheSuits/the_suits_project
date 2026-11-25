@@ -11,6 +11,7 @@ const deleteRoute = require('./routes/deleteRoute');
 const dailyReportsRoute = require('./routes/dailyReportsRoute');
 const reportExportRoute = require('./routes/reportExportRoute');
 const reportRoute = require('./routes/reportRoute');
+const { ensureIndexes } = require('./utils/dbMaintenance');
 
 
 const app = express();
@@ -46,9 +47,12 @@ app.get('/', (req, res) => {
 const PORT = process.env.PORT || 5000;
 
 // MongoDB connection
+// autoIndex is turned off so index changes run in a controlled order in
+// ensureIndexes() (drop the legacy name index first, then build the new ones).
 mongoose
-.connect(process.env.MONGO_URI)
-    .then(() => { 
+.connect(process.env.MONGO_URI, { autoIndex: false })
+    .then(async () => {
+        await ensureIndexes();
         app.listen(PORT, () => {
             console.log(`Server is running on port ${PORT}`);
         });
