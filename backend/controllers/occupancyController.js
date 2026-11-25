@@ -263,39 +263,53 @@ async function syncOne(input, { force, now }) {
 // Upserts by date (never duplicates). Omitted fields are left unchanged;
 // null clears a field. Days with manualOverride are skipped unless force.
 // Re-sending the same payload returns "unchanged" for every day.
+// Shared by the push endpoint (POST /sync) and the dashboard pull
+// (POST /pull-dashboard): same validation, same upsert rules.
+// Throws OccupancyError for request-level problems; per-record problems are
+// reported as { status: "invalid", message }.
+async function applySyncRecords(records, { force = false } = {}) {
+  if (!Array.isArray(records) || records.length === 0) {
+    throw new OccupancyError("Body must contain a non-empty records array.");
+  }
+  if (records.length > MAX_SYNC_RECORDS) {
+    throw new OccupancyError(`Send at most ${MAX_SYNC_RECORDS} records per request.`);
+  }
+  const dates = records.map((r) => parseDayKey(r?.date)).filter(Boolean);
+  if (new Set(dates).size !== dates.length) {
+    throw new OccupancyError("Each date may appear only once per request.");
+  }
+
+  const now = new Date();
+  const results = [];
+  for (const input of records) {
+    try {
+      results.push(await syncOne(input, { force: Boolean(force), now }));
+    } catch (err) {
+      if (err instanceof OccupancyError) {
+        results.push({ date: input?.date ?? null, status: "invalid", message: err.message });
+      } else {
+        throw err;
+      }
+    }
+  }
+  return { summary: summarizeResults(results), results };
+}
+
+const summarizeResults = (results) =>
+  results.reduce((acc, r) => ({ ...acc, [r.status]: (acc[r.status] || 0) + 1 }), {});
+
 exports.syncOccupancy = async (req, res) => {
   try {
     const { records, force = false } = req.body || {};
-    if (!Array.isArray(records) || records.length === 0) {
-      throw new OccupancyError("Body must contain a non-empty records array.");
-    }
-    if (records.length > MAX_SYNC_RECORDS) {
-      throw new OccupancyError(`Send at most ${MAX_SYNC_RECORDS} records per request.`);
-    }
-    const dates = records.map((r) => parseDayKey(r?.date)).filter(Boolean);
-    if (new Set(dates).size !== dates.length) {
-      throw new OccupancyError("Each date may appear only once per request.");
-    }
-
-    const now = new Date();
-    const results = [];
-    for (const input of records) {
-      try {
-        results.push(await syncOne(input, { force: Boolean(force), now }));
-      } catch (err) {
-        if (err instanceof OccupancyError) {
-          results.push({ date: input?.date ?? null, status: "invalid", message: err.message });
-        } else {
-          throw err;
-        }
-      }
-    }
-
-    const summary = results.reduce((acc, r) => ({ ...acc, [r.status]: (acc[r.status] || 0) + 1 }), {});
+    const { summary, results } = await applySyncRecords(records, { force });
     res.json({ timeZone: businessTimeZone(), summary, results });
   } catch (err) {
     handleError(res, err, "Occupancy sync failed");
   }
 };
 
+exports.applySyncRecords = applySyncRecords;
+exports.summarizeResults = summarizeResults;
+exports.OccupancyError = OccupancyError;
+exports.MAX_SYNC_RECORDS = MAX_SYNC_RECORDS;
 exports.COUNT_FIELDS = COUNT_FIELDS;

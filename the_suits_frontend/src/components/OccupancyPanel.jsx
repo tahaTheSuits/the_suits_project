@@ -56,6 +56,9 @@ export default function OccupancyPanel() {
   const [exporting, setExporting] = useState("");
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [forceSync, setForceSync] = useState(false);
+  const [syncResult, setSyncResult] = useState(null); // { ok, message, details? }
 
   const rangeInvalid = Boolean(fromDate && toDate && fromDate > toDate);
   const params = { from: fromDate || undefined, to: toDate || undefined };
@@ -93,6 +96,42 @@ export default function OccupancyPanel() {
       setError(getErrorMessage(err, "Export failed"));
     } finally {
       setExporting("");
+    }
+  };
+
+  // Pulls the selected period from the-suites-admin-dashboard via the API
+  // (the API holds the dashboard URL and key). Only runs on click.
+  const syncFromDashboard = async () => {
+    if (rangeInvalid) return setError("The From date must be on or before the To date.");
+    if (
+      forceSync &&
+      !window.confirm(
+        "Overwrite days that were edited manually in the warehouse with the dashboard's values?",
+      )
+    ) {
+      return;
+    }
+    setSyncing(true);
+    setSyncResult(null);
+    setError("");
+    try {
+      const res = await api.post(
+        "/api/occupancy/pull-dashboard",
+        { from: fromDate || undefined, to: toDate || undefined, force: forceSync },
+        { timeout: 60000 },
+      );
+      const invalid = (res.data.results || []).filter((r) => r.status === "invalid");
+      setSyncResult({
+        ok: invalid.length === 0,
+        message: res.data.message,
+        details: invalid.map((r) => `${r.date ?? "?"}: ${r.message}`),
+        skippedOverride: res.data.summary?.skipped_manual_override || 0,
+      });
+      await load(fromDate, toDate);
+    } catch (err) {
+      setSyncResult({ ok: false, message: getErrorMessage(err, "Sync from the dashboard failed") });
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -165,6 +204,9 @@ export default function OccupancyPanel() {
                 {exporting === "excel" ? "Exporting..." : "Export Excel"}
               </button>
               <button onClick={() => editDay({ date: report?.to || "", hasRecord: false })}>Add / edit day</button>
+              <button onClick={syncFromDashboard} disabled={syncing || rangeInvalid} title="Fetch this period from the admin dashboard">
+                {syncing ? "Syncing..." : "Sync from Dashboard"}
+              </button>
             </div>
           </div>
           <p className={`export-period${rangeInvalid ? " invalid" : ""}`}>
@@ -172,6 +214,34 @@ export default function OccupancyPanel() {
               ? "The From date must be on or before the To date."
               : "Leave dates empty for the last 7 days. Days follow the hotel's business day."}
           </p>
+
+          <label className="inline-check sync-force">
+            <input type="checkbox" checked={forceSync} onChange={(e) => setForceSync(e.target.checked)} />
+            Also overwrite manually edited days when syncing
+          </label>
+
+          {syncResult && (
+            <div className={`sync-result ${syncResult.ok ? "ok" : "error"}`} role="status">
+              <span>{syncResult.message}</span>
+              {syncResult.skippedOverride > 0 && !forceSync && (
+                <span className="field-hint">
+                  {" "}
+                  Days you edited manually were kept; tick the box above to overwrite them.
+                </span>
+              )}
+              {syncResult.details?.length > 0 && (
+                <ul>
+                  {syncResult.details.slice(0, 5).map((d) => (
+                    <li key={d}>{d}</li>
+                  ))}
+                  {syncResult.details.length > 5 && <li>…and {syncResult.details.length - 5} more</li>}
+                </ul>
+              )}
+              <button className="link-btn" onClick={() => setSyncResult(null)}>
+                Dismiss
+              </button>
+            </div>
+          )}
 
           {error && <p className="reports-error">{error}</p>}
           {notice && <p className="modal-notice">{notice}</p>}

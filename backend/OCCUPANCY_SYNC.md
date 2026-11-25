@@ -1,6 +1,14 @@
-# Occupancy sync contract (the-suites-admin-dashboard → warehouse API)
+# Occupancy sync contract (the-suites-admin-dashboard ↔ warehouse API)
 
-The admin dashboard pushes one record per **business day** (hotel calendar
+Two directions are supported, both feeding the same upsert pipeline:
+
+* **Push** — the dashboard sends records to `POST /api/occupancy/sync`
+  (sections below).
+* **Pull** — the warehouse fetches records from the dashboard's
+  `GET /api/integrations/warehouse/daily` (see *Pull from the dashboard* at the
+  end). This is what the **Sync from Dashboard** button uses.
+
+The admin dashboard provides one record per **business day** (hotel calendar
 date). The warehouse stores exactly one document per date and combines it with
 stock-out data in the *Consumption vs Occupancy* report.
 
@@ -114,3 +122,104 @@ By default that marks the day `manualOverride: true`, and syncs then skip it
 * `GET /api/occupancy?from=YYYY-MM-DD&to=YYYY-MM-DD` — stored days
 * `GET /api/occupancy/YYYY-MM-DD` — one day (`404` if none)
 * `GET /api/reports/occupancy-consumption?from=…&to=…` — the combined report
+
+
+## Pull from the dashboard (warehouse → dashboard)
+
+The warehouse UI's **Sync from Dashboard** button (Consumption vs Occupancy
+panel) calls the warehouse API, which then calls the dashboard. The browser
+never sees the dashboard URL or key.
+
+### What the dashboard must expose
+
+```
+GET {DASHBOARD_API_URL}/api/integrations/warehouse/daily?from=YYYY-MM-DD&to=YYYY-MM-DD
+X-Api-Key: <key>
+Authorization: Bearer <key>          (the same key is sent in both headers)
+Accept: application/json
+```
+
+Response `200`:
+
+```json
+{
+  "days": [
+    {
+      "date": "2026-11-24",
+      "totalApartments": 120,
+      "occupiedApartments": 96,
+      "vacantApartments": 24,
+      "checkIns": 14,
+      "checkOuts": 11,
+      "servicedApartments": 80,
+      "housekeepingCount": 92,
+      "laundryCount": 40,
+      "waterCount": 60,
+      "updatedAt": "2026-11-24T21:05:00Z"
+    }
+  ]
+}
+```
+
+* Same field meanings and rules as the push contract above (integers ≥ 0 or
+  `null`, `date` = hotel calendar day, omitted fields stay unchanged).
+* Other properties on a day are ignored. Days outside `from..to`, duplicate
+  dates and invalid dates are reported as `invalid` and skipped; the other
+  days are still applied.
+* Days in the range that the dashboard does not return are left unchanged
+  (listed in `missingDays`).
+* `401`/`403` → reported as "the dashboard rejected the API key"; any other
+  non-2xx, non-JSON or a body without `days[]` → reported as a dashboard error.
+
+### Warehouse endpoint
+
+```
+POST /api/occupancy/pull-dashboard
+Content-Type: application/json
+
+{ "from": "2026-11-18", "to": "2026-11-24", "force": false }
+```
+
+* `from`/`to` optional (default: the last 7 business days), at most 366 days.
+* `force: true` also overwrites days protected by a manual override.
+* One pull at a time per API process (`409 sync_in_progress` otherwise).
+
+Response `200`:
+
+```json
+{
+  "message": "Fetched 7 days from the dashboard: 2 created, 3 updated, 1 unchanged, 1 skipped (manual override).",
+  "from": "2026-11-18", "to": "2026-11-24", "timeZone": "Asia/Riyadh", "force": false,
+  "fetchedDays": 7,
+  "summary": { "created": 2, "updated": 3, "unchanged": 1, "skipped_manual_override": 1 },
+  "results": [ { "date": "2026-11-18", "status": "created" } ],
+  "missingDays": []
+}
+```
+
+Errors (JSON `{ message, code }`):
+
+| HTTP | code | Meaning |
+|---|---|---|
+| 400 | `invalid_range` | Bad/reversed dates or more than 366 days |
+| 409 | `sync_in_progress` | Another pull is running |
+| 503 | `dashboard_not_configured` | `DASHBOARD_API_URL` missing or not an http(s) URL |
+| 503 | `dashboard_key_missing` | No API key variable set |
+| 502 | `dashboard_unreachable` | DNS/connection failure |
+| 504 | `dashboard_timeout` | No answer within `DASHBOARD_TIMEOUT_MS` |
+| 502 | `dashboard_auth_failed` | Dashboard answered 401/403 |
+| 502 | `dashboard_error` | Dashboard answered another non-2xx status |
+| 502 | `dashboard_bad_response` | Not JSON or no `days[]` array |
+
+### Environment variables (warehouse API)
+
+| Variable | Required | Purpose |
+|---|---|---|
+| `DASHBOARD_API_URL` | for pull | Dashboard base URL, e.g. `https://admin.example.com` (trailing `/` is fine; do not include `/api/integrations/...`) |
+| `DASHBOARD_API_KEY` | for pull | Key sent to the dashboard as `X-Api-Key` and `Bearer` |
+| `WAREHOUSE_API_KEY` | fallback | Used if `DASHBOARD_API_KEY` is not set |
+| `OCCUPANCY_SYNC_TOKEN` | push; last fallback for pull | Token the dashboard must send to `POST /api/occupancy/sync`; also used as the pull key if neither variable above is set |
+| `DASHBOARD_TIMEOUT_MS` | no | Pull timeout in ms (default `15000`) |
+| `TZ` | recommended | Hotel time zone, e.g. `Asia/Riyadh` |
+
+Keys are never logged or returned by the API.
