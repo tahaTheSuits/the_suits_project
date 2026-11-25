@@ -113,6 +113,7 @@ export default function CurrentStockReport({ items, loaded, loading, error, onRe
                     <td data-label="Product">
                       {row.product}
                       {row.isActive === false && <span className="archived-tag">archived</span>}
+                      {row.barcode && <span className="barcode-tag">{row.barcode}</span>}
                     </td>
                     <td data-label="Unit">{row.unit}</td>
                     <td data-label="Available">{row.quantity}</td>

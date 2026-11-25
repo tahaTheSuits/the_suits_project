@@ -1,8 +1,10 @@
 const mongoose = require("mongoose");
 const Product = require("../models/productModel");
 const StockIn = require("../models/stockInModel");
+const Adjustment = require("../models/adjustmentModel");
 const { DEFAULT_UNIT, UNITS, normalizeUnit } = require("../utils/units");
-const { DEFAULT_MIN_STOCK } = require("../utils/stock");
+const { DEFAULT_MIN_STOCK, computeLedger, toStockRow } = require("../utils/stock");
+const { BARCODE_COLLATION, normalizeBarcode, validateBarcode } = require("../utils/barcode");
 
 // Case-insensitive comparison for product names.
 const NAME_COLLATION = { locale: "en", strength: 2 };
@@ -16,12 +18,28 @@ const findActiveByName = (name, excludeId) => {
   return Product.findOne(filter).collation(NAME_COLLATION);
 };
 
+const findActiveByBarcode = (barcode, excludeId) => {
+  const filter = { barcode, ...ACTIVE_FILTER };
+  if (excludeId) filter._id = { $ne: excludeId };
+  return Product.findOne(filter).collation(BARCODE_COLLATION);
+};
+
 const isDuplicateKeyError = (err) => err && err.code === 11000;
+const isBarcodeDuplicate = (err) =>
+  isDuplicateKeyError(err) && (err.keyPattern?.barcode || /barcode/.test(err.message || ""));
+
+const barcodeTakenMessage = (barcode, other) =>
+  `Barcode "${barcode}" is already used by "${other.name}".`;
+
+async function stockRowFor(product) {
+  const ledger = await computeLedger([product]);
+  return toStockRow(product, ledger.get(String(product._id)));
+}
 
 // Create Product
 exports.createProduct = async (req, res) => {
   try {
-    const { name, minStock, initialQty, unit } = req.body;
+    const { name, minStock, initialQty, unit, barcode } = req.body;
 
     const trimmedName = typeof name === "string" ? name.trim() : "";
     if (!trimmedName) {
@@ -49,11 +67,20 @@ exports.createProduct = async (req, res) => {
       }
     }
 
+    // Optional: products without a barcode work exactly as before.
+    const barcodeResult = validateBarcode(barcode);
+    if (barcodeResult.error) return res.status(400).json({ message: barcodeResult.error });
+
     const existingProduct = await findActiveByName(trimmedName);
     if (existingProduct) {
       return res.status(400).json({
         message: `Product "${existingProduct.name}" already exists`
       });
+    }
+
+    if (barcodeResult.value) {
+      const owner = await findActiveByBarcode(barcodeResult.value);
+      if (owner) return res.status(409).json({ message: barcodeTakenMessage(barcodeResult.value, owner) });
     }
 
     const product = await Product.create({
@@ -62,7 +89,18 @@ exports.createProduct = async (req, res) => {
       unit: normalizedUnit,
       quantity: initialQtyValue,
       isActive: true,
+      ...(barcodeResult.value ? { barcode: barcodeResult.value } : {}),
     });
+
+    if (barcodeResult.value) {
+      await Adjustment.create({
+        product: product._id,
+        kind: "barcode_change",
+        previousBarcode: null,
+        newBarcode: barcodeResult.value,
+        reason: "Barcode set when the product was created",
+      });
+    }
 
     if (initialQtyValue > 0) {
       try {
@@ -81,6 +119,9 @@ exports.createProduct = async (req, res) => {
 
     res.status(201).json(product);
   } catch (error) {
+    if (isBarcodeDuplicate(error)) {
+      return res.status(409).json({ message: "This barcode is already used by another active product." });
+    }
     if (isDuplicateKeyError(error)) {
       return res.status(400).json({
         message:
@@ -91,7 +132,118 @@ exports.createProduct = async (req, res) => {
   }
 };
 
+// PATCH /api/products/:id/barcode   body: { barcode: string|null|"", reason? }
+// Sets, changes or clears (null / "") a barcode. Every change is recorded in
+// the audit trail. Archived products may be edited too; uniqueness only
+// applies among active products.
+exports.updateBarcode = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid product ID." });
+    }
+
+    const barcodeResult = validateBarcode(req.body.barcode);
+    if (barcodeResult.error) return res.status(400).json({ message: barcodeResult.error });
+    const newBarcode = barcodeResult.value;
+
+    const reasonText = typeof req.body.reason === "string" ? req.body.reason.trim() : "";
+    if (reasonText.length > 500) return res.status(400).json({ message: "Reason must be at most 500 characters." });
+
+    const product = await Product.findById(id).lean();
+    if (!product) return res.status(404).json({ message: "Product not found." });
+
+    const previousBarcode = normalizeBarcode(product.barcode);
+    if (previousBarcode === newBarcode) {
+      return res.status(400).json({ message: "Barcode is unchanged." });
+    }
+
+    const isActive = product.isActive !== false;
+    if (newBarcode && isActive) {
+      const owner = await findActiveByBarcode(newBarcode, product._id);
+      if (owner) return res.status(409).json({ message: barcodeTakenMessage(newBarcode, owner) });
+    }
+
+    // Legacy products without an isActive field are marked active explicitly
+    // so the database-level unique index covers their barcode too.
+    const update = newBarcode
+      ? { $set: { barcode: newBarcode, ...(isActive ? { isActive: true } : {}) } }
+      : { $unset: { barcode: "" } };
+
+    try {
+      await Product.updateOne({ _id: product._id }, update);
+    } catch (err) {
+      if (isBarcodeDuplicate(err)) {
+        return res.status(409).json({ message: "This barcode is already used by another active product." });
+      }
+      throw err;
+    }
+
+    try {
+      await Adjustment.create({
+        product: product._id,
+        kind: "barcode_change",
+        previousBarcode,
+        newBarcode,
+        reason: reasonText || (newBarcode ? (previousBarcode ? "Barcode changed" : "Barcode set") : "Barcode removed"),
+      });
+    } catch (err) {
+      // No untraced change: revert if the audit record could not be written.
+      await Product.updateOne(
+        { _id: product._id },
+        previousBarcode ? { $set: { barcode: previousBarcode } } : { $unset: { barcode: "" } },
+      );
+      throw err;
+    }
+
+    const updated = await Product.findById(product._id).lean();
+    res.json({
+      message: newBarcode ? `Barcode for "${updated.name}" saved.` : `Barcode removed from "${updated.name}".`,
+      product: await stockRowFor(updated),
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// GET /api/products/by-barcode/:code
+// 200 { product } for an active product (with its ledger stock and unit).
+// 404 with a clear message when unknown, or when only an archived product
+// has that barcode.
+exports.getProductByBarcode = async (req, res) => {
+  try {
+    const barcodeResult = validateBarcode(req.params.code);
+    if (barcodeResult.error) return res.status(400).json({ message: barcodeResult.error });
+    if (!barcodeResult.value) return res.status(400).json({ message: "Barcode is required." });
+    const code = barcodeResult.value;
+
+    const product = await Product.findOne({ barcode: code, ...ACTIVE_FILTER })
+      .collation(BARCODE_COLLATION)
+      .lean();
+    if (product) return res.json({ product: await stockRowFor(product) });
+
+    const archived = await Product.findOne({ barcode: code, isActive: false })
+      .collation(BARCODE_COLLATION)
+      .sort({ archivedAt: -1 })
+      .lean();
+    if (archived) {
+      return res.status(404).json({
+        message: `Barcode "${code}" belongs to "${archived.name}", which is archived. Restore it to use it again.`,
+        archived: true,
+        productName: archived.name,
+      });
+    }
+
+    res.status(404).json({ message: `No product has barcode "${code}".`, archived: false });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // Archive Product (soft delete). Movements are kept so reports stay intact.
+// Archiving also frees the product's barcode for use by another product.
 exports.archiveProduct = async (req, res) => {
   try {
     const { id } = req.params;
@@ -117,7 +269,8 @@ exports.archiveProduct = async (req, res) => {
   }
 };
 
-// Restore an archived product, unless an active product now uses its name.
+// Restore an archived product, unless an active product now uses its name
+// or its barcode.
 exports.restoreProduct = async (req, res) => {
   try {
     const { id } = req.params;
@@ -139,6 +292,15 @@ exports.restoreProduct = async (req, res) => {
       });
     }
 
+    if (product.barcode) {
+      const owner = await findActiveByBarcode(product.barcode, product._id);
+      if (owner) {
+        return res.status(409).json({
+          message: `Cannot restore: barcode "${product.barcode}" is now used by "${owner.name}". Remove or change one of the barcodes first.`,
+        });
+      }
+    }
+
     product.isActive = true;
     product.archivedAt = null;
     await product.save();
@@ -146,7 +308,7 @@ exports.restoreProduct = async (req, res) => {
     res.status(200).json({ message: `Product "${product.name}" restored.`, product });
   } catch (err) {
     if (isDuplicateKeyError(err)) {
-      return res.status(409).json({ message: "Cannot restore: an active product with this name already exists." });
+      return res.status(409).json({ message: "Cannot restore: an active product with this name or barcode already exists." });
     }
     console.error(err);
     res.status(500).json({ message: err.message });

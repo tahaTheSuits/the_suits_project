@@ -15,6 +15,27 @@ export const UNITS = ["pcs", "gallon", "bag"];
 
 export const isCanceled = (err) => axios.isCancel(err) || err?.code === "ERR_CANCELED";
 
+// Idempotency key for one intended submission (e.g. one stock out).
+export const newRequestId = () =>
+  typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+
+// GET /api/products/by-barcode/:code -> active product row (with stock).
+// Barcodes are trimmed only; leading zeros and symbols are preserved.
+export const lookupBarcode = async (code, config) => {
+  const res = await api.get(`/api/products/by-barcode/${encodeURIComponent(code.trim())}`, config);
+  return res.data.product;
+};
+
+// Camera scanning uses the browser's BarcodeDetector API (no library).
+export const cameraScanSupported = () =>
+  typeof window !== "undefined" &&
+  "BarcodeDetector" in window &&
+  Boolean(navigator.mediaDevices?.getUserMedia);
+
+export const sleep =(ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // Local calendar date for filenames, e.g. "2026-11-25".
 export const todayStamp = () => {
   const d = new Date();

@@ -11,6 +11,7 @@ const mongoose = require("mongoose");
 //   product's unit, so a correction also resolves a legacy unit mismatch.
 //   correctedQuantity 0 voids the movement.
 // kind "min_stock_change": records a minStock edit on a product.
+// kind "barcode_change": records setting, changing or clearing a barcode.
 const adjustmentSchema = new mongoose.Schema(
   {
     product: {
@@ -20,7 +21,7 @@ const adjustmentSchema = new mongoose.Schema(
     },
     kind: {
       type: String,
-      enum: ["movement_correction", "min_stock_change"],
+      enum: ["movement_correction", "min_stock_change", "barcode_change"],
       required: true
     },
 
@@ -40,6 +41,10 @@ const adjustmentSchema = new mongoose.Schema(
     // --- min_stock_change ---
     previousMinStock: { type: Number, default: undefined }, // null/absent = default
     newMinStock: { type: Number, default: undefined },
+
+    // --- barcode_change --- (null = no barcode)
+    previousBarcode: { type: String, default: undefined },
+    newBarcode: { type: String, default: undefined },
 
     reason: {
       type: String,

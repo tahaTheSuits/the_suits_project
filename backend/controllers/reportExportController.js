@@ -156,6 +156,7 @@ const conflictText = (row) => {
 
 const CURRENT_STOCK_COLUMNS = [
   { header: "Product", width: 3, value: (r) => r.product + (r.isActive ? "" : " (archived)") },
+  { header: "Barcode", width: 1.8, value: (r) => r.barcode || "", onlyIfAny: (rows) => rows.some((r) => r.barcode) },
   { header: "Unit", width: 1, value: (r) => r.unit },
   { header: "Available", width: 1.2, align: "right", value: (r) => r.quantity },
   { header: "Min Stock", width: 1.4, align: "right", value: (r) => `${r.minStock}${r.minStockIsDefault ? " (default)" : ""}` },
@@ -185,8 +186,8 @@ exports.exportCurrentStockExcel = exportHandler("Current stock Excel export", as
   currentStockLines(report).forEach((line) => sheet.addRow([line]).font = { color: { argb: "FF596460" } });
   sheet.addRow([]);
 
-  const headers = ["Product", "Unit", "Available", "Min Stock", "Min Stock Source", "Status", "Archived", "Unit Conflict"];
-  const widths = [32, 10, 12, 12, 18, 14, 10, 50];
+  const headers = ["Product", "Barcode", "Unit", "Available", "Min Stock", "Min Stock Source", "Status", "Archived", "Unit Conflict"];
+  const widths = [32, 18, 10, 12, 12, 18, 14, 10, 50];
   const headerRow = sheet.addRow(headers);
   headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
   headerRow.eachCell((cell) => {
@@ -195,8 +196,9 @@ exports.exportCurrentStockExcel = exportHandler("Current stock Excel export", as
   widths.forEach((w, i) => { sheet.getColumn(i + 1).width = w; });
 
   report.rows.forEach((row) => {
-    sheet.addRow([
+    const added = sheet.addRow([
       row.product,
+      row.barcode || "",
       row.unit,
       row.quantity,
       row.minStock,
@@ -205,6 +207,8 @@ exports.exportCurrentStockExcel = exportHandler("Current stock Excel export", as
       row.isActive ? "No" : "Yes",
       conflictText(row) || "No",
     ]);
+    // Keep barcodes as text so Excel does not drop leading zeros.
+    added.getCell(2).numFmt = "@";
   });
   if (report.rows.length) {
     sheet.autoFilter = {
@@ -226,7 +230,9 @@ exports.exportCurrentStockPDF = exportHandler("Current stock PDF export", async 
     if (report.rows.length === 0) {
       doc.font("Helvetica").fontSize(11).text("No products.", { align: "center" });
     } else {
-      drawTable(doc, { columns: CURRENT_STOCK_COLUMNS, rows: report.rows });
+      // The Barcode column is shown only when at least one product has one.
+      const columns = CURRENT_STOCK_COLUMNS.filter((c) => !c.onlyIfAny || c.onlyIfAny(report.rows));
+      drawTable(doc, { columns, rows: report.rows });
     }
     addPageFooters(doc, `Current Stock Report · ${formatDate(report.generatedAt)}`);
   });

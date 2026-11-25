@@ -136,6 +136,7 @@ function toStockRow(product, totals) {
     totalIn: totals.totalIn,
     totalOut: totals.totalOut,
     unit: productUnitOf(product),
+    barcode: product.barcode || null,
     minStock: minStock.value,
     minStockIsDefault: minStock.isDefault,
     status: stockStatus(totals.quantity, minStock.value),

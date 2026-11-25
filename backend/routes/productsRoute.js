@@ -4,6 +4,8 @@ const {
   createProduct,
   archiveProduct,
   restoreProduct,
+  updateBarcode,
+  getProductByBarcode,
 } = require("../controllers/productsController");
 const {
   updateMinStock,
@@ -12,9 +14,12 @@ const {
 
 
 router.post("/", createProduct);
+// Declared before the /:id routes so "by-barcode" is never read as an id.
+router.get("/by-barcode/:code", getProductByBarcode);
 router.patch("/:id/archive", archiveProduct);
 router.patch("/:id/restore", restoreProduct);
 router.patch("/:id/min-stock", updateMinStock);
+router.patch("/:id/barcode", updateBarcode);
 router.get("/:id/movements", getProductMovements);
 
 module.exports = router;

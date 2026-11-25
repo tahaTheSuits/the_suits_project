@@ -18,7 +18,11 @@ const stockOutSchema = new mongoose.Schema(
       default: Date.now
     },
     unit: unitField,
-    note: String
+    note: String,
+    // Idempotency key sent by the client for one intended stock out, so a
+    // retried / double-submitted request (rapid scans, network retry) is
+    // recorded only once.
+    clientRequestId: { type: String, default: undefined }
   },
   { timestamps: true }
 );
@@ -27,5 +31,9 @@ const stockOutSchema = new mongoose.Schema(
 stockOutSchema.index({ product: 1, date: 1 });
 stockOutSchema.index({ date: 1 });
 stockOutSchema.index({ createdAt: 1 });
+stockOutSchema.index(
+  { clientRequestId: 1 },
+  { name: "client_request_unique", unique: true, partialFilterExpression: { clientRequestId: { $type: "string" } } }
+);
 
 module.exports = mongoose.model("StockOut", stockOutSchema);

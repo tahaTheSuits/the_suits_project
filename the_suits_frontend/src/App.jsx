@@ -5,6 +5,7 @@ import { setInventory } from "./features/inventory/inventorySlice.js";
 import { api, UNITS, getErrorMessage, isCanceled } from "./api.js";
 import Reports from "./components/reports.jsx";
 import ProductHistory from "./components/ProductHistory.jsx";
+import StockOutCard from "./components/StockOutCard.jsx";
 import logo from "./assets/logo2.png";
 import "./App.css";
 
@@ -56,13 +57,12 @@ function App() {
   // Stock in/out fields
   const [stockInProduct, setStockInProduct] = useState("");
   const [stockInQty, setStockInQty] = useState("");
-  const [stockOutProduct, setStockOutProduct] = useState("");
-  const [stockOutQty, setStockOutQty] = useState("");
 
   // New product
   const [newProductName, setNewProductName] = useState("");
   const [newProductQty, setNewProductQty] = useState("");
   const [newProductMinStock, setNewProductMinStock] = useState("");
+  const [newProductBarcode, setNewProductBarcode] = useState("");
   const [newProductUnit, setNewProductUnit] = useState("pcs");
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -176,6 +176,8 @@ function App() {
           name: newProductName.trim(),
           // Empty -> server default (5)
           minStock: newProductMinStock === "" ? undefined : Number(newProductMinStock),
+          // Optional; trimmed only, so leading zeros are kept.
+          barcode: newProductBarcode.trim() || undefined,
           initialQty: Number(newProductQty) || 0,
           unit: newProductUnit,
         }),
@@ -186,11 +188,11 @@ function App() {
       setNewProductName("");
       setNewProductMinStock("");
       setNewProductQty("");
+      setNewProductBarcode("");
     }
   };
 
   const stockInItem = activeItems.find((item) => item._id === stockInProduct);
-  const stockOutItem = activeItems.find((item) => item._id === stockOutProduct);
 
   // Stock In — always recorded in the product's own unit
   const handleStockIn = async () => {
@@ -210,26 +212,6 @@ function App() {
     if (ok) {
       setStockInProduct("");
       setStockInQty("");
-    }
-  };
-
-  // Stock Out — always recorded in the product's own unit
-  const handleStockOut = async () => {
-    if (!stockOutItem || !stockOutQty) return setMessage("Fill all Stock Out fields");
-    const ok = await runMutation(
-      "out",
-      () =>
-        api.post("/api/stock-out", {
-          productId: stockOutItem._id,
-          quantity: Number(stockOutQty),
-          unit: stockOutItem.unit,
-        }),
-      "Stock Out successful!",
-      "Stock Out failed",
-    );
-    if (ok) {
-      setStockOutProduct("");
-      setStockOutQty("");
     }
   };
 
@@ -260,7 +242,13 @@ function App() {
 
   const visibleItems = items
     .filter((item) => showArchived || item.isActive !== false)
-    .filter((item) => item.product.toLowerCase().includes(searchTerm.toLowerCase()))
+    .filter((item) => {
+      const term = searchTerm.trim().toLowerCase();
+      return (
+        item.product.toLowerCase().includes(term) ||
+        (item.barcode && item.barcode.toLowerCase().includes(term))
+      );
+    })
     .sort((a, b) => {
       // Active before archived, out-of-stock items at the bottom of each group.
       const archived = Number(a.isActive === false) - Number(b.isActive === false);
@@ -346,6 +334,15 @@ function App() {
               value={newProductMinStock}
               onChange={(e) => setNewProductMinStock(e.target.value)}
             />
+
+            <input
+              className="input"
+              placeholder="Barcode (optional)"
+              value={newProductBarcode}
+              onChange={(e) => setNewProductBarcode(e.target.value)}
+              autoComplete="off"
+              spellCheck={false}
+            />
           </div>
           <div className="card-actions">
             <button
@@ -400,51 +397,8 @@ function App() {
           </div>
         </div>
 
-        {/* Stock Out */}
-        <div className="card">
-          <h2>Stock Out</h2>
-          <div className="from-row">
-            <select
-              value={stockOutProduct}
-              onChange={(e) => setStockOutProduct(e.target.value)}
-            >
-              <option value="">Select Product</option>
-              {activeItems.map((item) => (
-                <option key={item._id} value={item._id}>
-                  {item.product} ({item.unit})
-                </option>
-              ))}
-            </select>
-
-            <input
-              className="input"
-              type="number"
-              min="1"
-              placeholder="Quantity"
-              value={stockOutQty}
-              onChange={(e) => setStockOutQty(e.target.value)}
-            />
-
-            <span className="unit-tag" title="Movements are recorded in the product's unit">
-              {stockOutItem ? stockOutItem.unit : "unit"}
-            </span>
-          </div>
-          {stockOutItem && (
-            <p className="field-hint">
-              Available: {stockOutItem.quantity} {stockOutItem.unit}
-            </p>
-          )}
-          <div className="card-actions">
-            <button
-              onClick={handleStockOut}
-              className="btn btn-danger"
-              style={{ width: "110px" }}
-              disabled={Boolean(submitting)}
-            >
-              {submitting === "out" ? "Saving..." : "Remove"}
-            </button>
-          </div>
-        </div>
+        {/* Stock Out — barcode scan or manual selection */}
+        <StockOutCard activeItems={activeItems} onRecorded={loadData} setMessage={setMessage} />
 
         {/* Search Inventory */}
         <div className="card search-card">
@@ -452,13 +406,13 @@ function App() {
           <div className="from-row">
             <input
               className="input search-input"
-              placeholder="Search product..."
+              placeholder="Search product or barcode..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <div className="card-actions card-note">
-            <span>Quickly find items by product name.</span>
+            <span>Quickly find items by product name or barcode.</span>
           </div>
         </div>
       </div>
@@ -513,6 +467,7 @@ function App() {
                   <tr key={item._id} className={archived ? "archived-row" : undefined}>
                     <td data-label="product">
                       {item.product}
+                      {item.barcode && <span className="barcode-tag">{item.barcode}</span>}
                       {item.unitConflicts?.length > 0 && (
                         <span
                           className="unit-warning"

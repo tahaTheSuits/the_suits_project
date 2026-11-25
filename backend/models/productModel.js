@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const { unitField } = require("../utils/units");
+const { normalizeBarcode } = require("../utils/barcode");
 
 const productSchema = new mongoose.Schema(
   {
@@ -32,6 +33,14 @@ const productSchema = new mongoose.Schema(
     archivedAt: {
       type: Date,
       default: null
+    },
+    // Optional. Stored as scanned (trimmed, leading zeros kept); absent when
+    // the product has no barcode. Unique (case-insensitive) among active
+    // products only, so an archived product's barcode can be reused.
+    barcode: {
+      type: String,
+      default: undefined,
+      set: (value) => normalizeBarcode(value) ?? undefined
     }
   },
   { timestamps: true }
@@ -48,5 +57,14 @@ productSchema.index(
   }
 );
 productSchema.index({ isActive: 1 });
+productSchema.index(
+  { barcode: 1 },
+  {
+    name: "barcode_active_ci_unique",
+    unique: true,
+    partialFilterExpression: { isActive: true, barcode: { $type: "string" } },
+    collation: { locale: "en", strength: 2 },
+  }
+);
 
 module.exports = mongoose.model("Product", productSchema);

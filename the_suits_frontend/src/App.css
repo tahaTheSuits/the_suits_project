@@ -665,3 +665,60 @@ select:focus {
   margin: 0.2rem 0 0.6rem;
   font-size: 0.9rem;
 }
+
+/* ===== Phase 4: barcode scanning ===== */
+.scan-row {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  margin-bottom: 0.35rem;
+}
+
+.scan-input {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+.scan-status {
+  margin: 0 0 0.4rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: 8px;
+  font-size: 0.84rem;
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+}
+
+.scan-status.matched {
+  background: var(--ok-bg);
+  color: var(--ok-text);
+  font-weight: 600;
+}
+
+.scan-status.error {
+  background: #fde7e9;
+  color: #ac1e2d;
+}
+
+.barcode-tag {
+  display: inline-block;
+  margin-left: 0.45rem;
+  padding: 0.05rem 0.4rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+  color: var(--text-muted);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+}
+
+.camera-scanner {
+  margin: 0.3rem 0 0.5rem;
+}
+
+.camera-video {
+  width: 100%;
+  max-height: 220px;
+  border-radius: 10px;
+  background: #000;
+  object-fit: cover;
+}

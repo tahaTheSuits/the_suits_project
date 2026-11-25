@@ -14,6 +14,9 @@ const describeAdjustment = (a) => {
   if (a.kind === "min_stock_change") {
     return `Min stock: ${a.previousMinStock ?? "default"} → ${a.newMinStock ?? "default"}`;
   }
+  if (a.kind === "barcode_change") {
+    return `Barcode: ${a.previousBarcode || "none"} → ${a.newBarcode || "none"}`;
+  }
   const unitFix =
     a.originalUnit && a.originalUnit !== a.correctedUnit ? ` (recorded as ${a.originalQuantity} ${a.originalUnit})` : "";
   const label = a.movementType === "in" ? "Stock in" : "Stock out";
@@ -35,6 +38,9 @@ export default function ProductHistory({ productId, onClose, onChanged }) {
   const [minStockInput, setMinStockInput] = useState("");
   const [minStockReason, setMinStockReason] = useState("");
 
+  const [barcodeInput, setBarcodeInput] = useState("");
+  const [barcodeReason, setBarcodeReason] = useState("");
+
   const load = useCallback(async () => {
     setLoading(true);
     const [historyRes, adjustmentsRes] = await Promise.allSettled([
@@ -45,6 +51,7 @@ export default function ProductHistory({ productId, onClose, onChanged }) {
       setHistory(historyRes.value.data);
       const p = historyRes.value.data.product;
       setMinStockInput(p.minStockIsDefault ? "" : String(p.minStock));
+      setBarcodeInput(p.barcode || "");
       setError("");
     } else {
       setError(getErrorMessage(historyRes.reason, "Failed to load movements"));
@@ -116,6 +123,19 @@ export default function ProductHistory({ productId, onClose, onChanged }) {
     if (ok) setMinStockReason("");
   };
 
+  // Empty input removes the barcode. Trimmed only (leading zeros kept).
+  const saveBarcode = async (value) => {
+    const ok = await submit(
+      () =>
+        api.patch(`/api/products/${productId}/barcode`, {
+          barcode: value.trim() || null,
+          reason: barcodeReason.trim() || undefined,
+        }),
+      value.trim() ? "Barcode saved." : "Barcode removed.",
+    );
+    if (ok) setBarcodeReason("");
+  };
+
   return (
     <div className="modal-backdrop" onClick={() => !busy && onClose()}>
       <div className="modal" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
@@ -163,6 +183,44 @@ export default function ProductHistory({ productId, onClose, onChanged }) {
               <p className="field-hint">
                 Currently {product.minStock} {product.unit}
                 {product.minStockIsDefault ? " (default)" : ""}. Leave empty to use the default.
+              </p>
+            </section>
+
+            <section className="modal-section">
+              <h3>Barcode</h3>
+              <div className="from-row">
+                <input
+                  className="input"
+                  placeholder="Scan or type barcode"
+                  value={barcodeInput}
+                  onChange={(e) => setBarcodeInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      if (!busy) saveBarcode(barcodeInput);
+                    }
+                  }}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <input
+                  className="input"
+                  placeholder="Reason (optional)"
+                  value={barcodeReason}
+                  onChange={(e) => setBarcodeReason(e.target.value)}
+                />
+                <button className="btn btn-primary" onClick={() => saveBarcode(barcodeInput)} disabled={busy}>
+                  Save
+                </button>
+                {product.barcode && (
+                  <button className="link-btn" onClick={() => saveBarcode("")} disabled={busy}>
+                    Remove
+                  </button>
+                )}
+              </div>
+              <p className="field-hint">
+                {product.barcode ? `Current barcode: ${product.barcode}.` : "No barcode yet (optional)."} Each
+                barcode can belong to only one active product.
               </p>
             </section>
 
