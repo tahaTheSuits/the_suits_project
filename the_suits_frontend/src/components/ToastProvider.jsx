@@ -1,11 +1,11 @@
 // Floating toast stack (top-right). Each toast has a unique id and time, so
 // rapid repeated actions ("Stock Out: 1 pcs of Soap" three times) each show
-// fresh feedback. Auto-dismiss after TOAST_MS via a CSS progress animation:
+// fresh feedback. Auto-dismiss after TOAST_MS (3 s) via a CSS progress animation:
 // hovering the toast pauses it, × closes it immediately.
 import { useCallback, useMemo, useRef, useState } from "react";
 import { ToastContext } from "../toast.js";
 
-const TOAST_MS = 3500;
+const TOAST_MS = 3000;
 const MAX_TOASTS = 5;
 
 const ICONS = { success: "✓", error: "✕", warning: "!", info: "i" };

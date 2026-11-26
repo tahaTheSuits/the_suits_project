@@ -4,6 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, getErrorMessage } from "../api.js";
 import { usePeriodLock } from "../periodLock.js";
+import { useToast } from "../toast.js";
 
 const ACTION_TEXT = {
   set: "Locked",
@@ -36,6 +37,7 @@ export default function PeriodLockControl() {
 
 function PeriodLockDialog({ onClose }) {
   const lock = usePeriodLock();
+  const notify = useToast();
   const [date, setDate] = useState(lock.lockedThroughDate || "");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -67,7 +69,7 @@ function PeriodLockDialog({ onClose }) {
         expectedLockedThroughDate: lock.lockedThroughDate,
       });
       lock.apply(res.data);
-      setNotice(res.data.message);
+      notify(res.data.message, res.data.action === "cleared" ? "warning" : "success");
       setReason("");
     } catch (err) {
       setNotice(getErrorMessage(err, "Saving the period lock failed"));

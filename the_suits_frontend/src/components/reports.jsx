@@ -105,7 +105,6 @@ function ReportTable({ title, type, section, onRetry, retrying, onEdit }) {
 
 export default function Reports({ sections, stock, products = [], refreshKey, onRetry, retrying }) {
   const notify = useToast();
-  const [error, setError] = useState("");
   const [editing, setEditing] = useState(null);
   // Panels stay mounted when another tab is shown (hidden), so loaded data
   // and form state survive tab switches.
@@ -145,10 +144,9 @@ export default function Reports({ sections, stock, products = [], refreshKey, on
   // Empty dates are allowed (all dates / open-ended); the server names the
   // file, e.g. stock-in-report_2026-11-01_to_2026-11-25.pdf.
   const exportReport = async (type, format) => {
-    if (rangeInvalid) return setError("The From date must be on or before the To date.");
+    if (rangeInvalid) return notify("The From date must be on or before the To date.", "warning");
     const label = `${type === "stock-in" ? "Stock In" : "Stock Out"} ${format === "pdf" ? "PDF" : "Excel"}`;
     const ext = format === "pdf" ? "pdf" : "xlsx";
-    setError("");
     setExporting(`${type}:${format}`);
     try {
       await downloadFile(`/api/export/${type}/${format}`, `${type}-report_${rangeSlug(fromDate, toDate)}.${ext}`, {
@@ -157,7 +155,7 @@ export default function Reports({ sections, stock, products = [], refreshKey, on
       });
     } catch (err) {
       console.error(err);
-      setError(getErrorMessage(err, `${label} export failed`));
+      notify(getErrorMessage(err, `${label} export failed`), "error");
     } finally {
       setExporting("");
     }
@@ -204,8 +202,6 @@ export default function Reports({ sections, stock, products = [], refreshKey, on
           </div>
         )}
       </div>
-
-      {error && <p className="reports-error">{error}</p>}
 
       <div className="tab-panel" role="tabpanel" id="tabpanel-balance" aria-labelledby="tab-balance" hidden={tab !== "balance"}>
         <CurrentStockReport {...stock} onRetry={onRetry} />

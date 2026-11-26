@@ -228,7 +228,7 @@ export default function StockOutCard({ activeItems, onRecorded, notify }) {
       )}
       {todayLocked && <p className="lock-warning">🔒 {lockMessage(lock.lockedThroughDate)}</p>}
       <div className="card-actions">
-        <button onClick={submit} className="btn btn-danger" style={{ width: "110px" }} disabled={saving || todayLocked}>
+        <button onClick={submit} className="btn btn-danger" disabled={saving || todayLocked}>
           {saving ? "Saving..." : "Remove"}
         </button>
       </div>

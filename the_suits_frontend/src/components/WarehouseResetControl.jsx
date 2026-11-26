@@ -1,4 +1,4 @@
-// Danger zone: full warehouse wipe (POST /api/warehouse/reset, mode
+// Full warehouse wipe dialog (POST /api/warehouse/reset, mode
 // "full_warehouse"). Shows what would be deleted, requires typing RESET (or
 // WIPE ALL), and hands the result to App so every view is cleared at once.
 import { useEffect, useRef, useState } from "react";
@@ -6,26 +6,9 @@ import { api, getErrorMessage } from "../api.js";
 
 const PHRASES = ["RESET", "WIPE ALL"];
 
-// Compact top-bar action; the dialog explains everything before anything
-// can be deleted.
-export default function WarehouseResetControl({ onReset }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <button
-        type="button"
-        className="btn btn-ghost-danger btn-sm"
-        onClick={() => setOpen(true)}
-        title="Reset All Warehouse Data (Delete Products & History)"
-      >
-        Reset Warehouse Data
-      </button>
-      {open && <ResetDialog onClose={() => setOpen(false)} onReset={onReset} />}
-    </>
-  );
-}
-
-function ResetDialog({ onClose, onReset }) {
+// Confirmation dialog for the full warehouse reset (opened from the
+// Settings menu).
+export default function ResetDialog({ onClose, onReset }) {
   const [preview, setPreview] = useState(null);
   const [error, setError] = useState("");
   const [typed, setTyped] = useState("");

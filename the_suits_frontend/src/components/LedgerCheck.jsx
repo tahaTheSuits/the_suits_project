@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, getErrorMessage } from "../api.js";
 import { isTodayLocked, lockMessage, usePeriodLock } from "../periodLock.js";
+import { useToast } from "../toast.js";
 
 const signed = (n) => (n > 0 ? `+${n}` : String(n));
 const formatDate = (date) => new Date(date).toLocaleDateString("en-GB");
@@ -85,6 +86,7 @@ export function ReconcileModal({ productId, productName, onClose, onChanged }) {
   const closeRef = useRef(null);
   const lock = usePeriodLock();
   const todayLocked = isTodayLocked(lock);
+  const notify = useToast();
 
   const load = useCallback(async () => {
     try {
@@ -125,7 +127,7 @@ export function ReconcileModal({ productId, productName, onClose, onChanged }) {
     setNotice("");
     try {
       const res = await api.post(`/api/products/${productId}/reconcile`, body);
-      setNotice(res.data.message);
+      notify(res.data.message, "success");
       setReason("");
       await Promise.all([load(), onChanged?.()]);
     } catch (err) {

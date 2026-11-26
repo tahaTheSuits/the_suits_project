@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, basisInfo, CONSUMPTION_BASES, getErrorMessage, inferConsumptionBasis, NO_LIMIT_HELP } from "../api.js";
 import MovementEditModal from "./MovementEditModal.jsx";
+import { useToast } from "../toast.js";
 import { isLockedDate, usePeriodLock } from "../periodLock.js";
 
 const formatDate = (date) => new Date(date).toLocaleDateString("en-GB");
@@ -60,6 +61,7 @@ export default function ProductHistory({ productId, products = [], onClose, onCh
 
   const [editing, setEditing] = useState(null); // movement being edited
   const lock = usePeriodLock();
+  const notify = useToast();
 
   const [minStockInput, setMinStockInput] = useState("");
   const [minStockReason, setMinStockReason] = useState("");
@@ -110,7 +112,8 @@ export default function ProductHistory({ productId, products = [], onClose, onCh
   };
 
   const afterEdit = async (result) => {
-    setNotice(result?.message ? `${result.message} The change is kept in the audit trail.` : "Entry updated.");
+    setNotice("");
+    notify(result?.message ? `${result.message} The change is kept in the audit trail.` : "Entry updated.", "success");
     await Promise.all([load(), onChanged()]);
   };
 
@@ -119,7 +122,7 @@ export default function ProductHistory({ productId, products = [], onClose, onCh
     setNotice("");
     try {
       const res = await request();
-      setNotice(successText);
+      notify(successText, "success");
       // The PATCH returns the updated product row: apply it to shared state
       // right away (badges, rule tags, alert refresh), then reload everything.
       if (res?.data?.product?._id) onProductUpdated?.(res.data.product);

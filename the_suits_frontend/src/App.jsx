@@ -18,7 +18,7 @@ import LedgerCheck from "./components/LedgerCheck.jsx";
 import { PeriodLockContext, isTodayLocked, lockMessage } from "./periodLock.js";
 import StockOutCard from "./components/StockOutCard.jsx";
 import PeriodLockControl from "./components/PeriodLockControl.jsx";
-import WarehouseResetControl from "./components/WarehouseResetControl.jsx";
+import SettingsMenu from "./components/SettingsMenu.jsx";
 import { useToast } from "./toast.js";
 import logo from "./assets/logo2.png";
 import "./App.css";
@@ -375,8 +375,10 @@ function App() {
         <div className="topbar-brand">
           <img className="topbar-logo" src={logo} alt="The Suites" />
           <div>
+            <p className="topbar-brand-name">
+              THE SUITES <span>· Warehouse</span>
+            </p>
             <h1 className="topbar-title">Warehouse Management</h1>
-            <p className="topbar-subtitle">Inventory control for housekeeping operations</p>
           </div>
         </div>
         <div className="topbar-actions">
@@ -384,7 +386,7 @@ function App() {
           <button type="button" className="btn btn-secondary btn-sm" onClick={() => loadData()} disabled={isLoading}>
             <span aria-hidden="true">↻</span> {isLoading ? "Refreshing..." : "Refresh"}
           </button>
-          <WarehouseResetControl onReset={handleWarehouseReset} />
+          <SettingsMenu onReset={handleWarehouseReset} />
         </div>
       </header>
 
@@ -441,7 +443,9 @@ function App() {
                 <button
                   key={key}
                   type="button"
-                  className={`btn btn-sm ${key === "add" ? "btn-primary" : "btn-secondary"}${activePanel === key ? " is-active" : ""}`}
+                  className={`btn btn-sm ${
+                    key === "add" ? "btn-primary" : key === "in" ? "btn-secondary btn-stock-in" : "btn-secondary btn-stock-out"
+                  }${activePanel === key ? " is-active" : ""}`}
                   onClick={() => setActivePanel(activePanel === key ? null : key)}
                   aria-expanded={activePanel === key}
                 >

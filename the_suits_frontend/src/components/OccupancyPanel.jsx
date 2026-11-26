@@ -3,6 +3,7 @@
 // out per product. Collapsed by default so it adds no requests on page load.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, basisInfo, downloadFile, getErrorMessage, rangeSlug } from "../api.js";
+import { useToast } from "../toast.js";
 import { dayBadge } from "../dayStatus.js";
 import DayDetailsModal, { DashboardLink } from "./DayDetailsModal.jsx";
 
@@ -72,13 +73,13 @@ const REFRESH_DELAY_MS = 250;
 // embedded: shown inside a tab (always open, no Open/Hide toggle); the
 // report is loaded the first time the tab becomes `active`.
 export default function OccupancyPanel({ refreshKey, embedded = false, active = true }) {
+  const notify = useToast();
   const [open, setOpen] = useState(embedded);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [report, setReport] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
   const [exporting, setExporting] = useState("");
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -151,7 +152,7 @@ export default function OccupancyPanel({ refreshKey, embedded = false, active = 
     try {
       await downloadFile(`/api/export/occupancy-consumption/${format}`, `occupancy-consumption_${slug}.${ext}`, params);
     } catch (err) {
-      setError(getErrorMessage(err, "Export failed"));
+      notify(getErrorMessage(err, "Export failed"), "error");
     } finally {
       setExporting("");
     }
@@ -179,15 +180,22 @@ export default function OccupancyPanel({ refreshKey, embedded = false, active = 
         { timeout: 60000 },
       );
       const invalid = (res.data.results || []).filter((r) => r.status === "invalid");
-      setSyncResult({
-        ok: invalid.length === 0,
-        message: res.data.message,
-        details: invalid.map((r) => `${r.date ?? "?"}: ${r.message}`),
-        skippedOverride: res.data.summary?.skipped_manual_override || 0,
-      });
+      const skippedOverride = res.data.summary?.skipped_manual_override || 0;
+      notify(res.data.message, invalid.length ? "warning" : "success");
+      // Keep a small panel only when there are details to read.
+      setSyncResult(
+        invalid.length || (skippedOverride && !forceSync)
+          ? {
+              ok: invalid.length === 0,
+              message: res.data.message,
+              details: invalid.map((r) => `${r.date ?? "?"}: ${r.message}`),
+              skippedOverride,
+            }
+          : null,
+      );
       await load(fromDate, toDate);
     } catch (err) {
-      setSyncResult({ ok: false, message: getErrorMessage(err, "Sync from the dashboard failed") });
+      notify(getErrorMessage(err, "Sync from the dashboard failed"), "error");
     } finally {
       setSyncing(false);
     }
@@ -195,7 +203,6 @@ export default function OccupancyPanel({ refreshKey, embedded = false, active = 
 
   const editDay = (day) => {
     setDetailsDay(null);
-    setNotice("");
     setForm({
       date: day.date,
       ...Object.fromEntries(
@@ -209,9 +216,8 @@ export default function OccupancyPanel({ refreshKey, embedded = false, active = 
   };
 
   const saveForm = async () => {
-    if (!form.date) return setNotice("Choose a date.");
+    if (!form.date) return notify("Choose a date.", "warning");
     setSaving(true);
-    setNotice("");
     try {
       // Empty fields are sent as null (= unknown), never as 0.
       const body = {
@@ -220,11 +226,11 @@ export default function OccupancyPanel({ refreshKey, embedded = false, active = 
         manualOverride: form.manualOverride,
       };
       const res = await api.put(`/api/occupancy/${form.date}`, body);
-      setNotice(res.data.message);
+      notify(res.data.message, "success");
       setForm(null);
       await load(fromDate, toDate);
     } catch (err) {
-      setNotice(getErrorMessage(err, "Save failed"));
+      notify(getErrorMessage(err, "Save failed"), "error");
     } finally {
       setSaving(false);
     }
@@ -305,7 +311,6 @@ export default function OccupancyPanel({ refreshKey, embedded = false, active = 
           )}
 
           {error && <p className="reports-error">{error}</p>}
-          {notice && <p className="modal-notice">{notice}</p>}
 
           {form && (
             <div className="correction-form occupancy-form">

@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { downloadFile, getErrorMessage, todayStamp } from "../api.js";
 import LedgerCheck from "./LedgerCheck.jsx";
+import { useToast } from "../toast.js";
 
 const STATUS = {
   out: { label: "Out of stock", className: "low" },
@@ -18,7 +19,7 @@ const conflictSummary = (conflicts = []) =>
 
 export default function CurrentStockReport({ items, loaded, loading, error, onRetry }) {
   const [includeArchived, setIncludeArchived] = useState(false);
-  const [exportError, setExportError] = useState("");
+  const notify = useToast();
   const [exporting, setExporting] = useState("");
 
   const rows = items.filter((item) => includeArchived || item.isActive !== false);
@@ -34,7 +35,6 @@ export default function CurrentStockReport({ items, loaded, loading, error, onRe
     const ext = format === "pdf" ? "pdf" : "xlsx";
     // Fallback only; the server's filename is used when the browser can read it.
     const filename = `current-stock${includeArchived ? "-with-archived" : ""}_${todayStamp()}.${ext}`;
-    setExportError("");
     setExporting(format);
     try {
       await downloadFile(`/api/export/current-stock/${format}`, filename, {
@@ -42,7 +42,7 @@ export default function CurrentStockReport({ items, loaded, loading, error, onRe
       });
     } catch (err) {
       console.error(err);
-      setExportError(getErrorMessage(err, `Current stock ${format === "pdf" ? "PDF" : "Excel"} export failed`));
+      notify(getErrorMessage(err, `Current stock ${format === "pdf" ? "PDF" : "Excel"} export failed`), "error");
     } finally {
       setExporting("");
     }
@@ -70,7 +70,6 @@ export default function CurrentStockReport({ items, loaded, loading, error, onRe
         </div>
       </div>
 
-      {exportError && <p className="reports-error">{exportError}</p>}
       {error && (
         <p className="reports-error">
           {error}
