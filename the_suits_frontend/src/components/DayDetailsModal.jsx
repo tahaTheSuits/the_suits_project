@@ -10,10 +10,29 @@ const gb = (key) => key.split("-").reverse().join("/");
 const dash = (v) => (v === null || v === undefined ? "–" : v);
 const CHIP_LIMIT = 40;
 const ANOMALY_TITLE = {
+  threshold: "Above the normal maximum",
   spike: "Above the period average",
-  zero_occupancy: "No occupied apartments",
-  non_cleaning_day: "No scheduled cleaning",
+  zero_service: "No service that day",
+  non_service_day: "No service scheduled",
 };
+
+// "per housekeeping room: 3.2 pcs (16 ÷ 5 rooms) · limit 2" etc.
+function AnomalyFigures({ r }) {
+  const parts = [];
+  if (r.type === "non_service_day") parts.push(`${r.quantity} ${r.unit} on a ${r.dayType}`);
+  else if (r.type === "zero_service") parts.push(`${r.quantity} ${r.unit} with 0 ${r.countLabel}`);
+  else if (r.basis === "fixed") parts.push(`${r.quantity} ${r.unit} today`);
+  else parts.push(`${r.rate} ${r.unit} (${r.quantity} ÷ ${r.count} ${r.countLabel})`);
+  if (r.threshold !== null && r.threshold !== undefined) parts.push(`normal max ${r.threshold}`);
+  else if (r.average !== null && r.average !== undefined) parts.push(`period average ${r.average}`);
+  if (r.ratio) parts.push(`${r.ratio}×`);
+  return (
+    <span className="anomaly-figures">
+      <span className={`basis-tag ${r.basis}`}>{r.basis === "fixed" ? "daily limit" : r.basisLabel}</span>
+      {parts.join(" · ")}
+    </span>
+  );
+}
 
 const longDate = (key) => {
   const [y, m, d] = key.split("-").map(Number);
@@ -207,14 +226,16 @@ export default function DayDetailsModal({ day, onClose, onEdit }) {
               {day.anomaly.reasons.map((r, i) => (
                 <li key={i}>
                   <strong>{ANOMALY_TITLE[r.type] || "Alert"}:</strong> {r.message}
+                  <AnomalyFigures r={r} />
                 </li>
               ))}
             </ul>
             <p className="field-hint">
-              On active cleaning days (not Sundays, holidays or days without scheduled cleaning), each product's stock
-              out per occupied apartment is compared with its average over this period&apos;s active cleaning days; above
-              1.5× is flagged. Any stock out on a day with 0 occupied apartments or without scheduled cleaning is also
-              flagged. Check the movements below for a wrong date, a wrong quantity or a double entry.
+              Each product is measured on its own basis: per housekeeping room (or serviced room), per laundry room, per
+              water-service room, or its daily total for fixed items. It is flagged above its normal maximum when one is
+              set, otherwise above 1.5× its average on this period&apos;s regular days (and more than 2 units). Use on a
+              Sunday, a holiday or a day with 0 of that service is flagged too. Products set to “None” are never flagged.
+              Check the movements below for a wrong date, a wrong quantity or a double entry.
             </p>
           </section>
         )}

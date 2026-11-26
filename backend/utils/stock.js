@@ -11,6 +11,7 @@ const StockIn = require("../models/stockInModel");
 const StockOut = require("../models/stockOutModel");
 const Adjustment = require("../models/adjustmentModel");
 const { DEFAULT_UNIT, normalizeUnit } = require("./units");
+const { consumptionRuleOf } = require("./consumptionRule");
 
 const DEFAULT_MIN_STOCK = 5;
 const MOVEMENT_MODELS = { in: StockIn, out: StockOut };
@@ -166,6 +167,14 @@ function toStockRow(product, totals) {
     totalAdjusted: totals.totalAdjusted,
     unit: productUnitOf(product),
     reconciliation: reconciliationOf(product, totals.quantity),
+    ...(() => {
+      const rule = consumptionRuleOf(product);
+      return {
+        consumptionBasis: rule.basis,
+        consumptionBasisInferred: rule.inferred,
+        normalMaxThreshold: rule.normalMaxThreshold,
+      };
+    })(),
     barcode: product.barcode || null,
     minStock: minStock.value,
     minStockIsDefault: minStock.isDefault,

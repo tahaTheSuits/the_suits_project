@@ -24,6 +24,7 @@ const { DEFAULT_UNIT, normalizeUnit } = require("./units");
 const { latestCorrectionLookup, EFFECTIVE_QUANTITY, IS_CORRECTED, productUnitOf } = require("./stock");
 const { businessTimeZone, paddedUtcWindow, resolveDayRange } = require("./businessDay");
 const { normalizeMeta } = require("./occupancyMeta");
+const { consumptionRuleOf, BASIS_LABELS } = require("./consumptionRule");
 
 const OCCUPANCY_FIELDS = [
   "totalApartments",
@@ -70,21 +71,48 @@ const FORMULAS = {
     "Σ stock out on days with housekeeping data ÷ Σ housekeeping tasks on those days",
 };
 
-// Consumption alerts (per product, never mixing units):
-//   active cleaning day = has an occupancy record and is not a Sunday, a
-//                         holiday or a day without scheduled cleaning
-//   period average      = Σ stock out on active days with occupied > 0
-//                         ÷ Σ occupied apartments on those days
-//   spike               = an active day whose stock out ÷ occupied apartments
-//                         exceeds ANOMALY_FACTOR × the period average
-//   zero_occupancy      = stock out on a day with 0 occupied apartments
-//   non_cleaning_day    = stock out on a Sunday / holiday / no-cleaning day
+// Consumption alerts, per product (never mixing units), using the product's
+// consumption rule (utils/consumptionRule.js):
+//
+//   basis         daily quantity is divided by
+//   housekeeping  housekeeping rooms (housekeepingCount, else servicedApartments)
+//   laundry       laundry services (laundryCount)
+//   water         water-service apartments (waterCount)
+//   fixed         nothing: the daily total itself is compared
+//   none          never evaluated
+//
+//   active day      has an occupancy record and is not a Sunday or holiday
+//                   (housekeeping basis: and not a day without scheduled
+//                   cleaning)
+//   period average  Σ quantity on active days ÷ Σ service count on those
+//                   days (fixed: ÷ number of active days)
+//
+// A product's use on a day is flagged when:
+//   non_service_day  stock out on a Sunday / holiday (housekeeping basis:
+//                    also on a day without scheduled cleaning)
+//   zero_service     stock out while the basis service count is 0
+//   threshold        normalMaxThreshold is set and the rate (fixed: the
+//                    daily quantity) exceeds it. A set threshold is the
+//                    product's own limit and replaces the average rule.
+//   spike            no threshold set, daily quantity > MIN_SPIKE_QUANTITY
+//                    and the rate exceeds ANOMALY_FACTOR × the period average
+// Days without an occupancy record, or whose service count is unknown, are
+// never flagged (except fixed-basis products, which need no count).
 const ANOMALY_FACTOR = 1.5;
+const MIN_SPIKE_QUANTITY = 2;
 
-const isActiveCleaningDay = (record) =>
-  Boolean(record) && record.isSunday !== true && record.isHoliday !== true && record.noScheduledCleaning !== true;
+const SERVICE_COUNT = {
+  housekeeping: (r) => (known(r.housekeepingCount) ? r.housekeepingCount : known(r.servicedApartments) ? r.servicedApartments : null),
+  laundry: (r) => (known(r.laundryCount) ? r.laundryCount : null),
+  water: (r) => (known(r.waterCount) ? r.waterCount : null),
+};
 
-const nonCleaningLabel = (meta) =>
+const isNonServiceDay = (record, basis) =>
+  record.isSunday === true || record.isHoliday === true || (basis === "housekeeping" && record.noScheduledCleaning === true);
+
+const isActiveDay = (record, basis) => Boolean(record) && !isNonServiceDay(record, basis);
+
+const nonServiceLabel = (meta) =>
   meta.isHoliday
     ? `holiday${meta.holidayName ? ` (${meta.holidayName})` : ""}`
     : meta.isSunday
@@ -171,18 +199,34 @@ async function buildOccupancyConsumptionReport(query = {}) {
     perProduct.set(id, entry);
   });
 
-  // Period average per occupied apartment on active cleaning days.
+  // Alert rule and period average on that rule's basis.
   perProduct.forEach((entry) => {
+    const rule = consumptionRuleOf(entry.product || {});
     let qty = 0;
-    let occupied = 0;
+    let count = 0;
     let days = 0;
-    occupancyByDay.forEach((record, day) => {
-      if (!isActiveCleaningDay(record) || !known(record.occupiedApartments) || record.occupiedApartments <= 0) return;
-      qty += entry.dayQty.get(day) || 0;
-      occupied += record.occupiedApartments;
-      days += 1;
-    });
-    entry.activeAverage = { value: occupied > 0 ? round(qty / occupied, 4) : null, days };
+    if (rule.basis !== "none") {
+      occupancyByDay.forEach((record, day) => {
+        if (!isActiveDay(record, rule.basis)) return;
+        if (rule.basis === "fixed") {
+          qty += entry.dayQty.get(day) || 0;
+          count += 1;
+          days += 1;
+          return;
+        }
+        const c = SERVICE_COUNT[rule.basis](record);
+        if (c === null || c <= 0) return;
+        qty += entry.dayQty.get(day) || 0;
+        count += c;
+        days += 1;
+      });
+    }
+    entry.rule = {
+      ...rule,
+      basisLabel: BASIS_LABELS[rule.basis].rate,
+      average: count > 0 ? round(qty / count, 4) : null,
+      averageDays: days,
+    };
   });
 
   const productRows = [...perProduct.entries()].map(([id, entry]) => {
@@ -204,7 +248,7 @@ async function buildOccupancyConsumptionReport(query = {}) {
       daysWithStockOut: [...entry.dayQty.values()].filter((q) => q > 0).length,
       outWithoutOccupancy: round(outWithoutOccupancy),
       unitConflicts: entry.unitConflicts,
-      activeDayAveragePerOccupied: entry.activeAverage,
+      alertRule: entry.rule,
       ...metrics,
     };
   });
@@ -267,6 +311,7 @@ async function buildOccupancyConsumptionReport(query = {}) {
     daysNoScheduledCleaning: days.filter((d) => d.noScheduledCleaning).length,
     anomalyDays: days.filter((d) => d.anomaly.flagged).length,
     anomalyFactor: ANOMALY_FACTOR,
+    anomalyMinQuantity: MIN_SPIKE_QUANTITY,
   };
 
   return {
@@ -283,59 +328,95 @@ async function buildOccupancyConsumptionReport(query = {}) {
   };
 }
 
-// Reasons a day's stock out looks unusual (see ANOMALY_FACTOR above).
+// Reasons a day's stock out looks unusual (see the rules above).
 function detectAnomalies(day, record, perProduct) {
-  const used = [...perProduct.values()]
-    .map((entry) => ({
-      product: entry.product?.name || "Unknown product",
-      unit: entry.unit,
-      quantity: round(entry.dayQty.get(day) || 0),
-      average: entry.activeAverage,
-    }))
-    .filter((u) => u.quantity > 0)
-    .sort((a, b) => a.product.localeCompare(b.product, "en", { sensitivity: "base" }));
   const reasons = [];
-  if (!record || used.length === 0) return { flagged: false, reasons };
-  const list = (items) => items.map((u) => `${u.quantity} ${u.unit} ${u.product}`).join(", ");
+  if (!record) return { flagged: false, reasons };
   const meta = normalizeMeta(record);
 
-  if (!isActiveCleaningDay(record)) {
-    const label = nonCleaningLabel(meta);
-    reasons.push({
-      type: "non_cleaning_day",
-      dayType: label,
-      items: used.map(({ product, unit, quantity }) => ({ product, unit, quantity })),
-      message: `Stock out on a ${label} with no scheduled cleaning: ${list(used)}.`,
-    });
-  }
-  if (record.occupiedApartments === 0) {
-    reasons.push({
-      type: "zero_occupancy",
-      items: used.map(({ product, unit, quantity }) => ({ product, unit, quantity })),
-      message: `Stock out while 0 apartments were occupied: ${list(used)}.`,
-    });
-  }
-  if (isActiveCleaningDay(record) && known(record.occupiedApartments) && record.occupiedApartments > 0) {
-    used.forEach((u) => {
-      const avg = u.average?.value;
-      if (!avg) return;
-      const rate = round(u.quantity / record.occupiedApartments, 4);
-      if (rate > avg * ANOMALY_FACTOR) {
-        const ratio = round(rate / avg, 2);
+  const used = [...perProduct.values()]
+    .map((entry) => ({ product: entry.product?.name || "Unknown product", unit: entry.unit, rule: entry.rule, quantity: round(entry.dayQty.get(day) || 0) }))
+    .filter((u) => u.quantity > 0 && u.rule.basis !== "none")
+    .sort((a, b) => a.product.localeCompare(b.product, "en", { sensitivity: "base" }));
+
+  used.forEach(({ product, unit, rule, quantity }) => {
+    const labels = BASIS_LABELS[rule.basis];
+    const base = { product, unit, quantity, basis: rule.basis, basisLabel: labels.rate, threshold: rule.normalMaxThreshold, average: rule.average };
+
+    if (isNonServiceDay(record, rule.basis)) {
+      const label = nonServiceLabel(meta);
+      reasons.push({
+        ...base,
+        type: "non_service_day",
+        dayType: label,
+        message: `${product}: ${quantity} ${unit} taken out on a ${label}, when no ${rule.basis === "fixed" ? "regular" : rule.basis} service is scheduled.`,
+      });
+      return;
+    }
+
+    if (rule.basis === "fixed") {
+      if (rule.normalMaxThreshold !== null) {
+        if (quantity > rule.normalMaxThreshold) {
+          reasons.push({
+            ...base,
+            type: "threshold",
+            rate: quantity,
+            ratio: round(quantity / rule.normalMaxThreshold, 2),
+            message: `${product}: ${quantity} ${unit} today is above its daily limit of ${rule.normalMaxThreshold} ${unit}.`,
+          });
+        }
+      } else if (rule.average && quantity > MIN_SPIKE_QUANTITY && quantity > rule.average * ANOMALY_FACTOR) {
         reasons.push({
+          ...base,
           type: "spike",
-          product: u.product,
-          unit: u.unit,
-          quantity: u.quantity,
-          occupied: record.occupiedApartments,
-          rate,
-          average: avg,
-          ratio,
-          message: `${u.product}: ${rate} ${u.unit} per occupied apartment (${u.quantity} ${u.unit} ÷ ${record.occupiedApartments}) is ${ratio}× the period average of ${avg} ${u.unit}.`,
+          rate: quantity,
+          ratio: round(quantity / rule.average, 2),
+          message: `${product}: ${quantity} ${unit} today is ${round(quantity / rule.average, 2)}× its period daily average of ${rule.average} ${unit}.`,
         });
       }
-    });
-  }
+      return;
+    }
+
+    const count = SERVICE_COUNT[rule.basis](record);
+    if (count === null) return; // service count unknown: cannot judge
+    if (count === 0) {
+      reasons.push({
+        ...base,
+        type: "zero_service",
+        count: 0,
+        countLabel: labels.count,
+        message: `${product}: ${quantity} ${unit} taken out while there were 0 ${labels.count}.`,
+      });
+      return;
+    }
+    const rate = round(quantity / count, 4);
+    const detail = `${rate} ${unit} ${labels.rate} (${quantity} ${unit} ÷ ${count} ${labels.count})`;
+    if (rule.normalMaxThreshold !== null) {
+      if (rate > rule.normalMaxThreshold) {
+        reasons.push({
+          ...base,
+          type: "threshold",
+          count,
+          countLabel: labels.count,
+          rate,
+          ratio: round(rate / rule.normalMaxThreshold, 2),
+          message: `${product}: ${detail} is above its normal maximum of ${rule.normalMaxThreshold} ${unit} ${labels.rate}.`,
+        });
+      }
+    } else if (rule.average && quantity > MIN_SPIKE_QUANTITY && rate > rule.average * ANOMALY_FACTOR) {
+      const ratio = round(rate / rule.average, 2);
+      reasons.push({
+        ...base,
+        type: "spike",
+        count,
+        countLabel: labels.count,
+        rate,
+        ratio,
+        message: `${product}: ${detail} is ${ratio}× the period average of ${rule.average} ${unit} ${labels.rate}.`,
+      });
+    }
+  });
+
   return { flagged: reasons.length > 0, reasons };
 }
 
@@ -345,4 +426,4 @@ function metricText(metric, unit) {
   return `${metric.value} ${unit}${metric.status === "partial" ? ` (${metric.daysWithData} of ${metric.totalDays} days)` : ""}`;
 }
 
-module.exports = { buildOccupancyConsumptionReport, metricText, METRICS, FORMULAS, ANOMALY_FACTOR };
+module.exports = { buildOccupancyConsumptionReport, metricText, METRICS, FORMULAS, ANOMALY_FACTOR, MIN_SPIKE_QUANTITY };

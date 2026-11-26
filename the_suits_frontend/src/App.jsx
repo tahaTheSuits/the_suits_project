@@ -2,7 +2,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { setInventory } from "./features/inventory/inventorySlice.js";
-import { api, UNITS, getErrorMessage, isCanceled } from "./api.js";
+import {
+  api,
+  UNITS,
+  CONSUMPTION_BASES,
+  basisInfo,
+  getErrorMessage,
+  inferConsumptionBasis,
+  isCanceled,
+} from "./api.js";
 import Reports from "./components/reports.jsx";
 import ProductHistory from "./components/ProductHistory.jsx";
 import LedgerCheck from "./components/LedgerCheck.jsx";
@@ -65,6 +73,8 @@ function App() {
   const [newProductMinStock, setNewProductMinStock] = useState("");
   const [newProductBarcode, setNewProductBarcode] = useState("");
   const [newProductUnit, setNewProductUnit] = useState("pcs");
+  const [newProductBasis, setNewProductBasis] = useState(""); // "" = auto from name
+  const [newProductThreshold, setNewProductThreshold] = useState("");
 
   const [searchTerm, setSearchTerm] = useState("");
   const [showArchived, setShowArchived] = useState(false);
@@ -181,6 +191,9 @@ function App() {
           barcode: newProductBarcode.trim() || undefined,
           initialQty: Number(newProductQty) || 0,
           unit: newProductUnit,
+          // Empty -> inferred from the name on the server.
+          consumptionBasis: newProductBasis || undefined,
+          normalMaxThreshold: newProductThreshold === "" ? undefined : Number(newProductThreshold),
         }),
       "Product added successfully!",
       "Failed to add product",
@@ -190,6 +203,8 @@ function App() {
       setNewProductMinStock("");
       setNewProductQty("");
       setNewProductBarcode("");
+      setNewProductBasis("");
+      setNewProductThreshold("");
     }
   };
 
@@ -344,6 +359,34 @@ function App() {
               autoComplete="off"
               spellCheck={false}
             />
+
+            <select
+              value={newProductBasis}
+              onChange={(e) => setNewProductBasis(e.target.value)}
+              aria-label="Consumption alert basis"
+              title="What this product's daily use is compared with for consumption alerts"
+            >
+              <option value="">
+                Alerts: auto ({basisInfo(inferConsumptionBasis(newProductName)).label})
+              </option>
+              {CONSUMPTION_BASES.map((b) => (
+                <option key={b.value} value={b.value}>
+                  Alerts: {b.label}
+                </option>
+              ))}
+            </select>
+
+            {(newProductBasis || inferConsumptionBasis(newProductName)) !== "none" && (
+              <input
+                className="input"
+                type="number"
+                min="0"
+                step="any"
+                placeholder={`Normal max ${basisInfo(newProductBasis || inferConsumptionBasis(newProductName)).rate} (optional)`}
+                value={newProductThreshold}
+                onChange={(e) => setNewProductThreshold(e.target.value)}
+              />
+            )}
           </div>
           <div className="card-actions">
             <button

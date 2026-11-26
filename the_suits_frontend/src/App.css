@@ -1188,3 +1188,49 @@ select:focus {
 .anomaly-list li + li {
   margin-top: 0.3rem;
 }
+
+
+/* ===== Consumption basis ===== */
+.basis-tag {
+  display: inline-block;
+  margin-left: 0.4rem;
+  padding: 0.05rem 0.42rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 650;
+  white-space: nowrap;
+  background: #e7ecf3;
+  color: #3c5272;
+  vertical-align: middle;
+}
+
+.basis-tag.laundry {
+  background: #efe9f5;
+  color: #5b4378;
+}
+
+.basis-tag.water {
+  background: #e3f1f6;
+  color: #1f5f75;
+}
+
+.basis-tag.fixed {
+  background: #fbefd9;
+  color: #7a4f06;
+}
+
+.basis-tag.none {
+  background: #e4e6e1;
+  color: #596460;
+}
+
+.anomaly-figures {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.anomaly-figures .basis-tag {
+  margin: 0 0.4rem 0 0;
+}

@@ -5,6 +5,12 @@ const Adjustment = require("../models/adjustmentModel");
 const { DEFAULT_UNIT, UNITS, normalizeUnit } = require("../utils/units");
 const { DEFAULT_MIN_STOCK, computeLedger, toStockRow } = require("../utils/stock");
 const { BARCODE_COLLATION, normalizeBarcode, validateBarcode } = require("../utils/barcode");
+const {
+  consumptionRuleOf,
+  inferConsumptionBasis,
+  readConsumptionRule,
+  RuleError,
+} = require("../utils/consumptionRule");
 
 // Case-insensitive comparison for product names.
 const NAME_COLLATION = { locale: "en", strength: 2 };
@@ -67,6 +73,15 @@ exports.createProduct = async (req, res) => {
       }
     }
 
+    // Consumption alert rule: basis defaults to the one inferred from the name.
+    let rule;
+    try {
+      rule = readConsumptionRule(req.body);
+    } catch (err) {
+      if (err instanceof RuleError) return res.status(400).json({ message: err.message });
+      throw err;
+    }
+
     // Optional: products without a barcode work exactly as before.
     const barcodeResult = validateBarcode(barcode);
     if (barcodeResult.error) return res.status(400).json({ message: barcodeResult.error });
@@ -89,6 +104,8 @@ exports.createProduct = async (req, res) => {
       unit: normalizedUnit,
       quantity: initialQtyValue,
       isActive: true,
+      consumptionBasis: rule.consumptionBasis || inferConsumptionBasis(trimmedName),
+      normalMaxThreshold: rule.normalMaxThreshold ?? null,
       ...(barcodeResult.value ? { barcode: barcodeResult.value } : {}),
     });
 
@@ -316,3 +333,76 @@ exports.restoreProduct = async (req, res) => {
 };
 
 exports.ACTIVE_FILTER = ACTIVE_FILTER;
+
+
+// PATCH /api/products/:id/consumption-rule
+// body: { consumptionBasis?: housekeeping|laundry|water|fixed|none|null,
+//         normalMaxThreshold?: positive number|null, reason? }
+// null basis returns to the name-based default. Audited as
+// consumption_rule_change.
+exports.updateConsumptionRule = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid product ID." });
+    }
+    let update;
+    try {
+      update = readConsumptionRule(req.body || {});
+    } catch (err) {
+      if (err instanceof RuleError) return res.status(400).json({ message: err.message });
+      throw err;
+    }
+    if (!Object.keys(update).length) {
+      return res.status(400).json({ message: "Send consumptionBasis and/or normalMaxThreshold." });
+    }
+    const reason = typeof req.body.reason === "string" ? req.body.reason.trim().slice(0, 500) : "";
+
+    const product = await Product.findById(id).lean();
+    if (!product) return res.status(404).json({ message: "Product not found." });
+
+    const before = consumptionRuleOf(product);
+    const set = {};
+    const unset = {};
+    if (Object.prototype.hasOwnProperty.call(update, "consumptionBasis")) {
+      if (update.consumptionBasis === null) unset.consumptionBasis = "";
+      else set.consumptionBasis = update.consumptionBasis;
+    }
+    if (Object.prototype.hasOwnProperty.call(update, "normalMaxThreshold")) set.normalMaxThreshold = update.normalMaxThreshold;
+
+    const after = consumptionRuleOf({ ...product, ...set, ...(unset.consumptionBasis !== undefined ? { consumptionBasis: undefined } : {}) });
+    if (
+      before.basis === after.basis &&
+      before.inferred === after.inferred &&
+      before.normalMaxThreshold === after.normalMaxThreshold
+    ) {
+      return res.status(400).json({ message: "The consumption rule is unchanged." });
+    }
+
+    await Product.updateOne({ _id: product._id }, { ...(Object.keys(set).length ? { $set: set } : {}), ...(Object.keys(unset).length ? { $unset: unset } : {}) });
+    try {
+      await Adjustment.create({
+        product: product._id,
+        kind: "consumption_rule_change",
+        previousRule: before,
+        newRule: after,
+        reason: reason || "Consumption alert rule updated",
+      });
+    } catch (err) {
+      // No untraced change: restore the previous values.
+      await Product.updateOne(
+        { _id: product._id },
+        product.consumptionBasis
+          ? { $set: { consumptionBasis: product.consumptionBasis, normalMaxThreshold: product.normalMaxThreshold ?? null } }
+          : { $unset: { consumptionBasis: "" }, $set: { normalMaxThreshold: product.normalMaxThreshold ?? null } },
+      );
+      throw err;
+    }
+
+    const updated = await Product.findById(product._id).lean();
+    res.json({ message: `Consumption rule for "${updated.name}" updated.`, product: await stockRowFor(updated) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: err.message });
+  }
+};

@@ -6,6 +6,7 @@ const {
   restoreProduct,
   updateBarcode,
   getProductByBarcode,
+  updateConsumptionRule,
 } = require("../controllers/productsController");
 const {
   updateMinStock,
@@ -21,6 +22,7 @@ router.patch("/:id/archive", archiveProduct);
 router.patch("/:id/restore", restoreProduct);
 router.patch("/:id/min-stock", updateMinStock);
 router.patch("/:id/barcode", updateBarcode);
+router.patch("/:id/consumption-rule", updateConsumptionRule);
 router.get("/:id/movements", getProductMovements);
 router.get("/:id/reconciliation", getProductReconciliation);
 router.post("/:id/reconcile", reconcile);

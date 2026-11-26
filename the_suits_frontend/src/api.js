@@ -13,6 +13,18 @@ export const api = axios.create({
 
 export const UNITS = ["pcs", "gallon", "bag"];
 
+// Consumption alert basis per product (mirrors backend utils/consumptionRule.js).
+export const CONSUMPTION_BASES = [
+  { value: "housekeeping", label: "Housekeeping", rate: "per housekeeping room" },
+  { value: "laundry", label: "Laundry", rate: "per laundry room" },
+  { value: "water", label: "Water", rate: "per water-service room" },
+  { value: "fixed", label: "Fixed daily", rate: "per day (daily limit)" },
+  { value: "none", label: "None (no alerts)", rate: null },
+];
+export const basisInfo = (value) => CONSUMPTION_BASES.find((b) => b.value === value) || CONSUMPTION_BASES[0];
+export const inferConsumptionBasis = (name = "") =>
+  /water|bottle/i.test(name) ? "water" : /tide|clora|detergent|bleach|laundry/i.test(name) ? "laundry" : "housekeeping";
+
 export const isCanceled = (err) => axios.isCancel(err) || err?.code === "ERR_CANCELED";
 
 // Idempotency key for one intended submission (e.g. one stock out).

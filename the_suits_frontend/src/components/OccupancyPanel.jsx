@@ -2,7 +2,7 @@
 // from the admin dashboard or entered manually) combined with corrected stock
 // out per product. Collapsed by default so it adds no requests on page load.
 import { useCallback, useState } from "react";
-import { api, downloadFile, getErrorMessage, rangeSlug } from "../api.js";
+import { api, basisInfo, downloadFile, getErrorMessage, rangeSlug } from "../api.js";
 import { dayBadge } from "../dayStatus.js";
 import DayDetailsModal, { DashboardLink } from "./DayDetailsModal.jsx";
 
@@ -342,6 +342,19 @@ export default function OccupancyPanel() {
                           <td data-label="Product">
                             {p.product}
                             {p.archived && <span className="archived-tag">archived</span>}
+                            {p.alertRule && (
+                              <span
+                                className={`basis-tag ${p.alertRule.basis}`}
+                                title={
+                                  p.alertRule.basis === "none"
+                                    ? "No consumption alerts for this product"
+                                    : `Alerts ${p.alertRule.basisLabel}${p.alertRule.normalMaxThreshold !== null ? `, normal max ${p.alertRule.normalMaxThreshold} ${p.unit}` : p.alertRule.average !== null ? `, period average ${p.alertRule.average} ${p.unit}` : ""}${p.alertRule.inferred ? " (basis set automatically from the name)" : ""}`
+                                }
+                              >
+                                {basisInfo(p.alertRule.basis).label}
+                                {p.alertRule.normalMaxThreshold !== null ? ` ≤ ${p.alertRule.normalMaxThreshold}` : ""}
+                              </span>
+                            )}
                             {p.unitConflicts > 0 && (
                               <span className="unit-warning">⚠ {p.unitConflicts} movement(s) in another unit</span>
                             )}

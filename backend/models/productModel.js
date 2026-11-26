@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 const { unitField } = require("../utils/units");
 const { normalizeBarcode } = require("../utils/barcode");
+const { CONSUMPTION_BASES } = require("../utils/consumptionRule");
 
 const productSchema = new mongoose.Schema(
   {
@@ -41,6 +42,19 @@ const productSchema = new mongoose.Schema(
       type: String,
       default: undefined,
       set: (value) => normalizeBarcode(value) ?? undefined
+    },
+    // Consumption alert rule (utils/consumptionRule.js). Absent on older
+    // products: the basis is then inferred from the name when read.
+    consumptionBasis: {
+      type: String,
+      enum: CONSUMPTION_BASES,
+      default: undefined
+    },
+    // Optional normal maximum per room of the basis (per day for "fixed").
+    normalMaxThreshold: {
+      type: Number,
+      min: 0,
+      default: null
     }
   },
   { timestamps: true }

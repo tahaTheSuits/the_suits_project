@@ -271,8 +271,17 @@ const sourceText = (day) =>
   !day.hasRecord ? "No record" : `${day.source === "manual" ? "Manual" : "Sync"}${day.manualOverride ? " (override)" : ""}`;
 const unitTotals = (list) => (list.length ? list.map((t) => `${t.quantity} ${t.unit}`).join(" · ") : "–");
 
+const ruleText = (row) => {
+  const r = row.alertRule;
+  if (!r) return "";
+  if (r.basis === "none") return "alerts off";
+  const limit = r.normalMaxThreshold !== null ? `, max ${r.normalMaxThreshold}` : "";
+  return `alerts ${r.basisLabel}${limit}${r.inferred ? " (auto)" : ""}`;
+};
+
 const productNotes = (row) =>
   [
+    ruleText(row),
     row.archived ? "archived product" : "",
     row.outWithoutOccupancy > 0 ? `${row.outWithoutOccupancy} ${row.unit} on days without occupancy data` : "",
     row.unitConflicts ? `${row.unitConflicts} movement(s) recorded in another unit` : "",
@@ -287,7 +296,7 @@ const occupancyLines = (report) => {
     `Occupancy data for ${s.daysWithOccupancy} of ${s.totalDays} days · service data for ${s.daysWithServicedApartments} · housekeeping data for ${s.daysWithHousekeeping}`,
     `Occupied apartment-nights: ${dash(s.occupiedApartmentNights)} · serviced apartments: ${dash(s.servicedApartments)} · housekeeping tasks: ${dash(s.housekeepingTasks)} · average occupancy: ${pct(s.averageOccupancyRate)}`,
     ...(s.anomalyDays
-      ? [`Consumption alerts on ${s.anomalyDays} day(s): over ${s.anomalyFactor}× the period average per occupied apartment, or stock out on a day without occupancy / scheduled cleaning`]
+      ? [`Consumption alerts on ${s.anomalyDays} day(s): per product basis (housekeeping / laundry / water room, or daily total); above the product's normal maximum, or over ${s.anomalyFactor}× its period average with more than ${s.anomalyMinQuantity} units, or used on a day without that service`]
       : []),
     ...(s.daysNoScheduledCleaning || s.daysHoliday || s.daysSunday
       ? [`Sundays: ${s.daysSunday || 0} · holidays: ${s.daysHoliday || 0} · days without scheduled cleaning: ${s.daysNoScheduledCleaning || 0}`]
@@ -391,8 +400,8 @@ exports.exportOccupancyConsumptionExcel = exportHandler("Occupancy consumption E
   const metricHeaders = METRICS.flatMap((m) => [`Per ${m.label.replace(/^per /, "")}`, `Days with data (${m.label})`]);
   const header = addStyledHeader(
     sheet,
-    ["Product", "Unit", "Total out", "Movements", ...metricHeaders, "Out on days without occupancy", "Unit conflicts", "Archived", "Notes"],
-    [30, 9, 11, 11, ...METRICS.flatMap(() => [24, 14]), 18, 12, 10, 40],
+    ["Product", "Unit", "Total out", "Movements", ...metricHeaders, "Out on days without occupancy", "Unit conflicts", "Archived", "Notes", "Alert basis", "Normal max", "Period average (alert basis)"],
+    [30, 9, 11, 11, ...METRICS.flatMap(() => [24, 14]), 18, 12, 10, 40, 26, 12, 16],
   );
   report.products.forEach((r) => {
     sheet.addRow([
@@ -408,6 +417,9 @@ exports.exportOccupancyConsumptionExcel = exportHandler("Occupancy consumption E
       r.unitConflicts,
       r.archived ? "Yes" : "No",
       productNotes(r),
+      r.alertRule.basis === "none" ? "none (no alerts)" : `${r.alertRule.basis} (${r.alertRule.basisLabel})${r.alertRule.inferred ? " auto" : ""}`,
+      r.alertRule.normalMaxThreshold,
+      r.alertRule.average,
     ]);
   });
   if (report.products.length === 0) sheet.addRow(["No stock out in this period."]);

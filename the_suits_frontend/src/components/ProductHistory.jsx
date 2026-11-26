@@ -2,7 +2,7 @@
 // in-place editing of entries (audited, reason required), minStock editing,
 // and the product's audit trail.
 import { useCallback, useEffect, useState } from "react";
-import { api, getErrorMessage } from "../api.js";
+import { api, basisInfo, CONSUMPTION_BASES, getErrorMessage, inferConsumptionBasis } from "../api.js";
 import MovementEditModal from "./MovementEditModal.jsx";
 
 const formatDate = (date) => new Date(date).toLocaleDateString("en-GB");
@@ -17,6 +17,13 @@ const describeAdjustment = (a) => {
   }
   if (a.kind === "barcode_change") {
     return `Barcode: ${a.previousBarcode || "none"} → ${a.newBarcode || "none"}`;
+  }
+  if (a.kind === "consumption_rule_change") {
+    const text = (r) =>
+      r
+        ? `${basisInfo(r.basis).label}${r.inferred ? " (auto)" : ""}${r.normalMaxThreshold !== null && r.normalMaxThreshold !== undefined ? `, max ${r.normalMaxThreshold}` : ""}`
+        : "—";
+    return `Consumption alerts: ${text(a.previousRule)} → ${text(a.newRule)}`;
   }
   if (a.kind === "stock_adjustment") {
     return `Stock adjustment ${signed(a.quantityDelta)} ${a.unit || ""} (ledger ${a.ledgerQuantity} → ${a.newCachedQuantity})`;
@@ -58,6 +65,10 @@ export default function ProductHistory({ productId, products = [], onClose, onCh
   const [barcodeInput, setBarcodeInput] = useState("");
   const [barcodeReason, setBarcodeReason] = useState("");
 
+  const [ruleBasis, setRuleBasis] = useState(""); // "" = auto from name
+  const [ruleThreshold, setRuleThreshold] = useState("");
+  const [ruleReason, setRuleReason] = useState("");
+
   const load = useCallback(async () => {
     setLoading(true);
     const [historyRes, adjustmentsRes] = await Promise.allSettled([
@@ -69,6 +80,8 @@ export default function ProductHistory({ productId, products = [], onClose, onCh
       const p = historyRes.value.data.product;
       setMinStockInput(p.minStockIsDefault ? "" : String(p.minStock));
       setBarcodeInput(p.barcode || "");
+      setRuleBasis(p.consumptionBasisInferred ? "" : p.consumptionBasis || "");
+      setRuleThreshold(p.normalMaxThreshold === null || p.normalMaxThreshold === undefined ? "" : String(p.normalMaxThreshold));
       setError("");
     } else {
       setError(getErrorMessage(historyRes.reason, "Failed to load movements"));
@@ -125,6 +138,20 @@ export default function ProductHistory({ productId, products = [], onClose, onCh
       "Min stock updated.",
     );
     if (ok) setMinStockReason("");
+  };
+
+  const saveRule = async () => {
+    if (ruleThreshold !== "" && !(Number(ruleThreshold) > 0)) return setNotice("Normal max must be a positive number, or empty.");
+    const ok = await submit(
+      () =>
+        api.patch(`/api/products/${productId}/consumption-rule`, {
+          consumptionBasis: ruleBasis || null,
+          normalMaxThreshold: ruleThreshold === "" ? null : Number(ruleThreshold),
+          reason: ruleReason.trim() || undefined,
+        }),
+      "Consumption alert rule saved.",
+    );
+    if (ok) setRuleReason("");
   };
 
   // Empty input removes the barcode. Trimmed only (leading zeros kept).
@@ -225,6 +252,51 @@ export default function ProductHistory({ productId, products = [], onClose, onCh
               <p className="field-hint">
                 {product.barcode ? `Current barcode: ${product.barcode}.` : "No barcode yet (optional)."} Each
                 barcode can belong to only one active product.
+              </p>
+            </section>
+
+            <section className="modal-section">
+              <h3>Consumption alerts</h3>
+              <div className="from-row">
+                <select value={ruleBasis} onChange={(e) => setRuleBasis(e.target.value)} aria-label="Alert basis">
+                  <option value="">Auto from name ({basisInfo(inferConsumptionBasis(product.product)).label})</option>
+                  {CONSUMPTION_BASES.map((b) => (
+                    <option key={b.value} value={b.value}>
+                      {b.label}
+                    </option>
+                  ))}
+                </select>
+                {(ruleBasis || inferConsumptionBasis(product.product)) !== "none" && (
+                  <input
+                    className="input"
+                    type="number"
+                    min="0"
+                    step="any"
+                    placeholder={`Normal max ${basisInfo(ruleBasis || inferConsumptionBasis(product.product)).rate} (optional)`}
+                    value={ruleThreshold}
+                    onChange={(e) => setRuleThreshold(e.target.value)}
+                    aria-label="Normal maximum"
+                  />
+                )}
+                <input
+                  className="input"
+                  placeholder="Reason (optional)"
+                  value={ruleReason}
+                  onChange={(e) => setRuleReason(e.target.value)}
+                />
+                <button className="btn btn-primary" onClick={saveRule} disabled={busy}>
+                  Save
+                </button>
+              </div>
+              <p className="field-hint">
+                Currently: {basisInfo(product.consumptionBasis).label}
+                {product.consumptionBasisInferred ? " (auto from the name)" : ""}
+                {product.consumptionBasis === "none"
+                  ? " — never flagged."
+                  : product.normalMaxThreshold
+                    ? ` — flagged above ${product.normalMaxThreshold} ${product.unit} ${basisInfo(product.consumptionBasis).rate}.`
+                    : ` — flagged above 1.5× its period average ${basisInfo(product.consumptionBasis).rate} (days with more than 2 ${product.unit}).`}{" "}
+                Any use on Sundays, holidays or with 0 of that service is also flagged.
               </p>
             </section>
 

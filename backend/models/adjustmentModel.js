@@ -37,6 +37,7 @@ const adjustmentSchema = new mongoose.Schema(
         "stock_adjustment",
         "cache_reconcile",
         "movement_edit",
+        "consumption_rule_change",
       ],
       required: true
     },
@@ -70,6 +71,10 @@ const adjustmentSchema = new mongoose.Schema(
     previousCachedQuantity: Number, // stored Product.quantity before
     newCachedQuantity: Number, // stored Product.quantity after
     ledgerQuantity: Number, // ledger balance at that moment (before the change)
+
+    // --- consumption_rule_change --- ({ basis, inferred, normalMaxThreshold })
+    previousRule: { type: mongoose.Schema.Types.Mixed, default: undefined },
+    newRule: { type: mongoose.Schema.Types.Mixed, default: undefined },
 
     // --- movement_edit ---
     changes: { type: mongoose.Schema.Types.Mixed, default: undefined },
