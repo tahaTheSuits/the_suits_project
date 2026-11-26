@@ -22,7 +22,10 @@ const stockInSchema = new mongoose.Schema(
       default: Date.now
     },
     unit: unitField,
-    note: String
+    note: String,
+    // Set when the movement is edited in place (PATCH /api/movements/...).
+    editedAt: { type: Date, default: null },
+    editCount: { type: Number, default: 0 }
   },
   { timestamps: true }
 );

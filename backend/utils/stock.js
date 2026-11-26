@@ -1,8 +1,10 @@
 // Inventory ledger helpers.
-// Current stock = sum(effective StockIn) - sum(effective StockOut) per product,
+// Current stock = sum(effective StockIn) - sum(effective StockOut)
+//               + sum(documented stock adjustments) per product,
 // where a movement's effective quantity is its latest correction
 // (Adjustment kind "movement_correction") or, if never corrected, its own
-// quantity. Product.quantity is only a cache of that value.
+// quantity. Product.quantity is the stored ("current") stock: it should
+// always equal the ledger; reconciliation reports when it does not.
 
 const Product = require("../models/productModel");
 const StockIn = require("../models/stockInModel");
@@ -32,6 +34,23 @@ function stockStatus(quantity, minStock) {
 }
 
 const productUnitOf = (product) => normalizeUnit(product.unit) || DEFAULT_UNIT;
+
+// Avoids 0.1 + 0.2 style noise in balances and differences.
+const roundQty = (n) => Math.round((Number(n) || 0) * 1000) / 1000;
+
+// Stored stock (Product.quantity) vs the ledger. difference > 0: the stored
+// value is higher than the ledger explains.
+function reconciliationOf(product, ledgerQuantity) {
+  const stored = Number(product.quantity);
+  const current = Number.isFinite(stored) ? roundQty(stored) : null;
+  const difference = current === null ? null : roundQty(current - ledgerQuantity);
+  return {
+    expected: ledgerQuantity,
+    current,
+    difference,
+    balanced: difference === 0,
+  };
+}
 
 // Aggregation stage: attaches `latestCorrection` (0 or 1 element) to each
 // StockIn/StockOut document.
@@ -81,14 +100,18 @@ async function computeLedger(products) {
     },
   ];
 
-  const [ins, outs] = await Promise.all([
+  const [ins, outs, adjustments] = await Promise.all([
     StockIn.aggregate(pipeline("in")),
     StockOut.aggregate(pipeline("out")),
+    Adjustment.aggregate([
+      { $match: { kind: "stock_adjustment", product: { $in: ids } } },
+      { $group: { _id: "$product", total: { $sum: "$quantityDelta" }, count: { $sum: 1 } } },
+    ]),
   ]);
 
   const units = new Map(products.map((p) => [String(p._id), productUnitOf(p)]));
   const ledger = new Map(
-    products.map((p) => [String(p._id), { totalIn: 0, totalOut: 0, conflicts: new Map() }]),
+    products.map((p) => [String(p._id), { totalIn: 0, totalOut: 0, totalAdjusted: 0, conflicts: new Map() }]),
   );
 
   const add = (rows, direction) => {
@@ -112,13 +135,18 @@ async function computeLedger(products) {
   };
   add(ins, "in");
   add(outs, "out");
+  adjustments.forEach((row) => {
+    const entry = ledger.get(String(row._id));
+    if (entry) entry.totalAdjusted += Number(row.total) || 0;
+  });
 
   const result = new Map();
   ledger.forEach((entry, id) => {
     result.set(id, {
       totalIn: entry.totalIn,
       totalOut: entry.totalOut,
-      quantity: entry.totalIn - entry.totalOut,
+      totalAdjusted: roundQty(entry.totalAdjusted),
+      quantity: roundQty(entry.totalIn - entry.totalOut + entry.totalAdjusted),
       unitConflicts: [...entry.conflicts.values()],
     });
   });
@@ -135,7 +163,9 @@ function toStockRow(product, totals) {
     quantity: totals.quantity,
     totalIn: totals.totalIn,
     totalOut: totals.totalOut,
+    totalAdjusted: totals.totalAdjusted,
     unit: productUnitOf(product),
+    reconciliation: reconciliationOf(product, totals.quantity),
     barcode: product.barcode || null,
     minStock: minStock.value,
     minStockIsDefault: minStock.isDefault,
@@ -171,6 +201,8 @@ module.exports = {
   effectiveMinStock,
   stockStatus,
   productUnitOf,
+  roundQty,
+  reconciliationOf,
   latestCorrectionLookup,
   EFFECTIVE_QUANTITY,
   IS_CORRECTED,

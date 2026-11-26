@@ -6,18 +6,20 @@ import { useState } from "react";
 import { downloadFile, getErrorMessage, rangeSlug } from "../api.js";
 import CurrentStockReport from "./CurrentStockReport.jsx";
 import OccupancyPanel from "./OccupancyPanel.jsx";
+import MovementEditModal from "./MovementEditModal.jsx";
+import PeriodBalance from "./PeriodBalance.jsx";
 import "./reports.css";
 
 const SECTIONS = [
-  { key: "dailyOut", title: "Daily Stock Out" },
-  { key: "weeklyOut", title: "Weekly Stock Out" },
-  { key: "dailyIn", title: "Daily Stock In" },
-  { key: "weeklyIn", title: "Weekly Stock In" },
+  { key: "dailyOut", title: "Daily Stock Out", type: "out" },
+  { key: "weeklyOut", title: "Weekly Stock Out", type: "out" },
+  { key: "dailyIn", title: "Daily Stock In", type: "in" },
+  { key: "weeklyIn", title: "Weekly Stock In", type: "in" },
 ];
 
 const formatDate = (date) => new Date(date).toLocaleDateString("en-GB");
 
-function ReportTable({ title, section, onRetry, retrying }) {
+function ReportTable({ title, type, section, onRetry, retrying, onEdit }) {
   const { data, loading, error, loaded } = section;
 
   return (
@@ -45,6 +47,7 @@ function ReportTable({ title, section, onRetry, retrying }) {
                 <th>Product</th>
                 <th>Quantity</th>
                 <th>Unit</th>
+                <th></th>
               </tr>
             </thead>
             <tbody>
@@ -69,6 +72,14 @@ function ReportTable({ title, section, onRetry, retrying }) {
                     )}
                   </td>
                   <td data-label="Unit">{item.unit}</td>
+                  <td data-label="">
+                    {item.editedAt && <span className="corrected-tag" title="This entry was edited">edited</span>}
+                    {item.product && (
+                      <button className="link-btn" onClick={() => onEdit(type, item)}>
+                        Edit
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -79,8 +90,25 @@ function ReportTable({ title, section, onRetry, retrying }) {
   );
 }
 
-export default function Reports({ sections, stock, onRetry, retrying }) {
+export default function Reports({ sections, stock, products = [], onRetry, retrying }) {
   const [error, setError] = useState("");
+  const [editing, setEditing] = useState(null);
+  const [notice, setNotice] = useState("");
+
+  const startEdit = (type, item) => {
+    setNotice("");
+    setEditing({
+      _id: item._id,
+      movementType: type,
+      productId: item.product,
+      productName: item.productName,
+      quantity: item.quantity,
+      unit: item.unit,
+      date: item.date,
+      note: item.note,
+      source: item.source,
+    });
+  };
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
 
@@ -133,6 +161,7 @@ export default function Reports({ sections, stock, onRetry, retrying }) {
       <OccupancyPanel />
 
       {error && <p className="reports-error">{error}</p>}
+      {notice && <p className="modal-notice">{notice}</p>}
 
       {/* Date Filters */}
       <div className="reports-filters">
@@ -175,15 +204,36 @@ export default function Reports({ sections, stock, onRetry, retrying }) {
         </div>
       </div>
 
-      {SECTIONS.map(({ key, title }) => (
+      <PeriodBalance
+        fromDate={fromDate}
+        toDate={toDate}
+        rangeInvalid={rangeInvalid}
+        periodLabel={periodLabel}
+        onChanged={onRetry}
+      />
+
+      {SECTIONS.map(({ key, title, type }) => (
         <ReportTable
           key={key}
           title={title}
+          type={type}
           section={sections[key]}
           onRetry={onRetry}
           retrying={retrying}
+          onEdit={startEdit}
         />
       ))}
+      {editing && (
+        <MovementEditModal
+          movement={editing}
+          products={products}
+          onClose={() => setEditing(null)}
+          onSaved={async (result) => {
+            setNotice(`${result?.message || "Entry updated."} Stock and reports were refreshed.`);
+            await onRetry();
+          }}
+        />
+      )}
     </div>
   );
 }

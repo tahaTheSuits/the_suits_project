@@ -11,10 +11,12 @@ const {
     getCurrentStockReport,
     getOccupancyConsumptionReport,
 } = require("../controllers/reportController");
+const { getStockBalance } = require("../controllers/reconciliationController");
 
 router.get("/occupancy-consumption", getOccupancyConsumptionReport);
 
 router.get("/current-stock", getCurrentStockReport);
+router.get("/stock-balance", getStockBalance);
 
 router.get("/stock-out/daily", getDailyReport);
 router.get("/stock-out/weekly", getWeeklyReport);

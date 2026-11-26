@@ -312,6 +312,12 @@ export default function OccupancyPanel() {
                 {dash(s.occupiedApartmentNights)} · serviced {dash(s.servicedApartments)} · housekeeping tasks{" "}
                 {dash(s.housekeepingTasks)} · avg occupancy{" "}
                 {s.averageOccupancyRate === null ? "N/A" : `${Math.round(s.averageOccupancyRate * 1000) / 10}%`}
+                {s.anomalyDays > 0 && (
+                  <span className="anomaly-summary">
+                    {" "}
+                    · ⚠ {s.anomalyDays} day{s.anomalyDays === 1 ? "" : "s"} with unusual consumption
+                  </span>
+                )}
               </p>
 
               <h3 className="occupancy-subtitle">Consumption by product</h3>
@@ -379,7 +385,10 @@ export default function OccupancyPanel() {
                     {report.days.map((d) => {
                       const badge = dayBadge(d);
                       return (
-                      <tr key={d.date} className={d.hasRecord ? undefined : "missing-row"}>
+                      <tr
+                        key={d.date}
+                        className={[d.hasRecord ? "" : "missing-row", d.anomaly?.flagged ? "anomaly-row" : ""].join(" ").trim() || undefined}
+                      >
                         <td data-label="Date">
                           <span className="day-date">
                             {gb(d.date)}
@@ -406,6 +415,16 @@ export default function OccupancyPanel() {
                         </td>
                         <td data-label="Stock out">
                           {d.stockOutByUnit.length ? d.stockOutByUnit.map((t) => `${t.quantity} ${t.unit}`).join(" · ") : "–"}
+                          {d.anomaly?.flagged && (
+                            <button
+                              type="button"
+                              className="anomaly-badge"
+                              title={d.anomaly.reasons.map((r) => r.message).join("\n")}
+                              onClick={() => setDetailsDay(d)}
+                            >
+                              ⚠ Unusual use
+                            </button>
+                          )}
                         </td>
                         <td data-label="" className="day-actions">
                           <button className="link-btn" onClick={() => setDetailsDay(d)}>

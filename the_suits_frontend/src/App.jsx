@@ -5,6 +5,7 @@ import { setInventory } from "./features/inventory/inventorySlice.js";
 import { api, UNITS, getErrorMessage, isCanceled } from "./api.js";
 import Reports from "./components/reports.jsx";
 import ProductHistory from "./components/ProductHistory.jsx";
+import LedgerCheck from "./components/LedgerCheck.jsx";
 import StockOutCard from "./components/StockOutCard.jsx";
 import logo from "./assets/logo2.png";
 import "./App.css";
@@ -467,6 +468,13 @@ function App() {
                   <tr key={item._id} className={archived ? "archived-row" : undefined}>
                     <td data-label="product">
                       {item.product}
+                      <LedgerCheck
+                        productId={item._id}
+                        productName={item.product}
+                        reconciliation={item.reconciliation}
+                        onChanged={loadData}
+                        compact
+                      />
                       {item.barcode && <span className="barcode-tag">{item.barcode}</span>}
                       {item.unitConflicts?.length > 0 && (
                         <span
@@ -533,12 +541,14 @@ function App() {
           loading: inventoryState.loading,
           error: inventoryState.error,
         }}
+        products={activeItems}
         onRetry={loadData}
         retrying={isLoading}
       />
       {historyProductId && (
         <ProductHistory
           productId={historyProductId}
+          products={activeItems}
           onClose={() => setHistoryProductId(null)}
           onChanged={loadData}
         />

@@ -19,6 +19,9 @@ const stockOutSchema = new mongoose.Schema(
     },
     unit: unitField,
     note: String,
+    // Set when the movement is edited in place (PATCH /api/movements/...).
+    editedAt: { type: Date, default: null },
+    editCount: { type: Number, default: 0 },
     // Idempotency key sent by the client for one intended stock out, so a
     // retried / double-submitted request (rapid scans, network retry) is
     // recorded only once.

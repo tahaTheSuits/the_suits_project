@@ -11,6 +11,7 @@ const {
   updateMinStock,
   getProductMovements,
 } = require("../controllers/adjustmentsController");
+const { getProductReconciliation, reconcile } = require("../controllers/reconciliationController");
 
 
 router.post("/", createProduct);
@@ -21,5 +22,7 @@ router.patch("/:id/restore", restoreProduct);
 router.patch("/:id/min-stock", updateMinStock);
 router.patch("/:id/barcode", updateBarcode);
 router.get("/:id/movements", getProductMovements);
+router.get("/:id/reconciliation", getProductReconciliation);
+router.post("/:id/reconcile", reconcile);
 
 module.exports = router;

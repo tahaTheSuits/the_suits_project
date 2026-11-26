@@ -10,7 +10,9 @@ const { latestCorrectionLookup, EFFECTIVE_QUANTITY, IS_CORRECTED } = require("./
 // Only fields that exist in the schemas. (Floor / Used By were never stored,
 // so they are no longer projected or exported as empty columns.)
 const IN_FIELDS = { source: 1 };
-const OUT_FIELDS = { note: 1 };
+const OUT_FIELDS = {};
+// product id, note and editedAt let the UI open the Edit dialog for a row.
+const COMMON_FIELDS = { product: 1, note: 1, editedAt: 1 };
 
 const buildMovementPipeline = (movementType, { start, end }, sort) => [
   { $match: { date: { $gte: start, $lte: end } } },
@@ -36,6 +38,7 @@ const buildMovementPipeline = (movementType, { start, end }, sort) => [
       corrected: IS_CORRECTED,
       correctionReason: { $arrayElemAt: ["$latestCorrection.reason", 0] },
       date: 1,
+      ...COMMON_FIELDS,
       ...(movementType === "in" ? IN_FIELDS : OUT_FIELDS),
     },
   },

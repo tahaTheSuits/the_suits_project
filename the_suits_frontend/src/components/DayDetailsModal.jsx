@@ -9,6 +9,11 @@ import { dayBadge } from "../dayStatus.js";
 const gb = (key) => key.split("-").reverse().join("/");
 const dash = (v) => (v === null || v === undefined ? "–" : v);
 const CHIP_LIMIT = 40;
+const ANOMALY_TITLE = {
+  spike: "Above the period average",
+  zero_occupancy: "No occupied apartments",
+  non_cleaning_day: "No scheduled cleaning",
+};
 
 const longDate = (key) => {
   const [y, m, d] = key.split("-").map(Number);
@@ -193,6 +198,25 @@ export default function DayDetailsModal({ day, onClose, onEdit }) {
               <span>Scheduled cleaning was not paused on this day.</span>
             </div>
           )
+        )}
+
+        {day.anomaly?.flagged && (
+          <section className="modal-section anomaly-section" role="alert">
+            <h3>⚠ Unusual consumption</h3>
+            <ul className="anomaly-list">
+              {day.anomaly.reasons.map((r, i) => (
+                <li key={i}>
+                  <strong>{ANOMALY_TITLE[r.type] || "Alert"}:</strong> {r.message}
+                </li>
+              ))}
+            </ul>
+            <p className="field-hint">
+              On active cleaning days (not Sundays, holidays or days without scheduled cleaning), each product's stock
+              out per occupied apartment is compared with its average over this period&apos;s active cleaning days; above
+              1.5× is flagged. Any stock out on a day with 0 occupied apartments or without scheduled cleaning is also
+              flagged. Check the movements below for a wrong date, a wrong quantity or a double entry.
+            </p>
+          </section>
         )}
 
         <section className="modal-section">

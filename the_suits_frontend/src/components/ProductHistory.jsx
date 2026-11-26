@@ -1,8 +1,9 @@
 // Product history panel: movements with original vs effective quantities,
-// quantity corrections (append-only, reason required), minStock editing,
+// in-place editing of entries (audited, reason required), minStock editing,
 // and the product's audit trail.
 import { useCallback, useEffect, useState } from "react";
 import { api, getErrorMessage } from "../api.js";
+import MovementEditModal from "./MovementEditModal.jsx";
 
 const formatDate = (date) => new Date(date).toLocaleDateString("en-GB");
 const formatDateTime = (date) =>
@@ -17,13 +18,31 @@ const describeAdjustment = (a) => {
   if (a.kind === "barcode_change") {
     return `Barcode: ${a.previousBarcode || "none"} → ${a.newBarcode || "none"}`;
   }
+  if (a.kind === "stock_adjustment") {
+    return `Stock adjustment ${signed(a.quantityDelta)} ${a.unit || ""} (ledger ${a.ledgerQuantity} → ${a.newCachedQuantity})`;
+  }
+  if (a.kind === "cache_reconcile") {
+    return `Stored stock aligned with the ledger: ${a.previousCachedQuantity} → ${a.newCachedQuantity} ${a.unit || ""}`;
+  }
+  if (a.kind === "movement_edit") {
+    const label = a.movementType === "in" ? "Stock in" : "Stock out";
+    const c = a.changes || {};
+    const parts = [];
+    if (c.date) parts.push(`date ${formatDate(c.date.from)} → ${formatDate(c.date.to)}`);
+    if (c.product) parts.push(`product ${c.product.fromName} → ${c.product.toName}`);
+    if (c.note) parts.push(`note “${c.note.from || "—"}” → “${c.note.to || "—"}”`);
+    if (c.source) parts.push(`source ${c.source.from || "—"} → ${c.source.to || "—"}`);
+    return `${label} edited: ${parts.join(", ")}`;
+  }
   const unitFix =
     a.originalUnit && a.originalUnit !== a.correctedUnit ? ` (recorded as ${a.originalQuantity} ${a.originalUnit})` : "";
   const label = a.movementType === "in" ? "Stock in" : "Stock out";
   return `${label}: ${a.previousQuantity} → ${a.correctedQuantity} ${a.correctedUnit}${unitFix} · stock ${signed(a.quantityDelta)}`;
 };
 
-export default function ProductHistory({ productId, onClose, onChanged }) {
+const TYPE_LABEL = { in: "Stock in", out: "Stock out", adjustment: "Adjustment" };
+
+export default function ProductHistory({ productId, products = [], onClose, onChanged }) {
   const [history, setHistory] = useState(null);
   const [adjustments, setAdjustments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,9 +50,7 @@ export default function ProductHistory({ productId, onClose, onChanged }) {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const [editing, setEditing] = useState(null); // movement being corrected
-  const [correctedQty, setCorrectedQty] = useState("");
-  const [correctionReason, setCorrectionReason] = useState("");
+  const [editing, setEditing] = useState(null); // movement being edited
 
   const [minStockInput, setMinStockInput] = useState("");
   const [minStockReason, setMinStockReason] = useState("");
@@ -65,18 +82,21 @@ export default function ProductHistory({ productId, onClose, onChanged }) {
   }, [load]);
 
   useEffect(() => {
-    const onKey = (e) => e.key === "Escape" && !busy && onClose();
+    const onKey = (e) => e.key === "Escape" && !busy && !editing && onClose();
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [busy, onClose]);
+  }, [busy, editing, onClose]);
 
   const product = history?.product;
 
-  const startCorrection = (movement) => {
-    setEditing(movement);
-    setCorrectedQty(String(movement.quantity));
-    setCorrectionReason("");
+  const startEdit = (movement) => {
     setNotice("");
+    setEditing({ ...movement, productName: product?.product });
+  };
+
+  const afterEdit = async (result) => {
+    setNotice(result?.message ? `${result.message} The change is kept in the audit trail.` : "Entry updated.");
+    await Promise.all([load(), onChanged()]);
   };
 
   const submit = async (request, successText) => {
@@ -93,22 +113,6 @@ export default function ProductHistory({ productId, onClose, onChanged }) {
     } finally {
       setBusy(false);
     }
-  };
-
-  const saveCorrection = async () => {
-    if (correctedQty === "" || Number(correctedQty) < 0) return setNotice("Enter the correct quantity (0 or more).");
-    if (correctionReason.trim().length < 3) return setNotice("Enter a reason (at least 3 characters).");
-    const ok = await submit(
-      () =>
-        api.post("/api/adjustments/movement", {
-          movementType: editing.movementType,
-          movementId: editing._id,
-          correctedQuantity: Number(correctedQty),
-          reason: correctionReason.trim(),
-        }),
-      "Correction recorded. The original entry is kept in the history.",
-    );
-    if (ok) setEditing(null);
   };
 
   const saveMinStock = async () => {
@@ -227,8 +231,9 @@ export default function ProductHistory({ productId, onClose, onChanged }) {
             <section className="modal-section">
               <h3>Movements</h3>
               <p className="field-hint">
-                Corrections never change the original entry: they record the true quantity (in{" "}
-                {product.unit}) with a reason. Enter 0 to void an entry.
+                Edit fixes an entry in place (quantity in {product.unit}, date, product or note) with a reason;
+                the stock moves by the exact difference and every change stays in the audit trail. Enter 0 to void
+                an entry.
               </p>
               <div className="table-wrapper">
                 <table className="reports-table history-table">
@@ -250,13 +255,21 @@ export default function ProductHistory({ productId, onClose, onChanged }) {
                     {history.movements.map((m) => (
                       <tr key={m._id} className={m.unitConflict ? "conflict-row" : undefined}>
                         <td data-label="Date">{formatDate(m.date)}</td>
-                        <td data-label="Type">{m.movementType === "in" ? "Stock in" : "Stock out"}</td>
+                        <td data-label="Type">
+                          {TYPE_LABEL[m.movementType]}
+                          {m.editedAt && (
+                            <span className="corrected-tag" title={`Edited ${formatDateTime(m.editedAt)}`}>
+                              edited
+                            </span>
+                          )}
+                        </td>
                         <td data-label="Recorded">
-                          {m.originalQuantity} {m.originalUnit}
+                          {m.movementType === "adjustment" ? signed(m.originalQuantity) : m.originalQuantity} {m.originalUnit}
                           {m.unitConflict && <span className="unit-warning">⚠ different unit</span>}
                         </td>
                         <td data-label="Counted as">
-                          {m.quantity} {m.unit}
+                          {m.movementType === "adjustment" ? signed(m.quantity) : m.quantity} {m.unit}
+                          {m.movementType === "adjustment" && m.note && <span className="muted"> · {m.note}</span>}
                           {m.corrected && (
                             <span className="corrected-tag" title={m.corrections.at(-1)?.reason}>
                               corrected ×{m.corrections.length}
@@ -264,9 +277,9 @@ export default function ProductHistory({ productId, onClose, onChanged }) {
                           )}
                         </td>
                         <td data-label="">
-                          {editing?._id === m._id ? null : (
-                            <button className="link-btn" onClick={() => startCorrection(m)} disabled={busy}>
-                              Correct
+                          {m.movementType !== "adjustment" && (
+                            <button className="link-btn" onClick={() => startEdit(m)} disabled={busy}>
+                              Edit
                             </button>
                           )}
                         </td>
@@ -277,43 +290,12 @@ export default function ProductHistory({ productId, onClose, onChanged }) {
               </div>
               {history.limited && <p className="field-hint">Showing the most recent movements only.</p>}
 
-              {editing && (
-                <div className="correction-form">
-                  <p>
-                    Correct {editing.movementType === "in" ? "stock in" : "stock out"} of{" "}
-                    {formatDate(editing.date)} (counted as {editing.quantity} {product.unit}
-                    {editing.unitConflict ? `, recorded as ${editing.originalQuantity} ${editing.originalUnit}` : ""}):
-                  </p>
-                  <div className="from-row">
-                    <input
-                      className="input"
-                      type="number"
-                      min="0"
-                      placeholder={`True quantity (${product.unit})`}
-                      value={correctedQty}
-                      onChange={(e) => setCorrectedQty(e.target.value)}
-                    />
-                    <input
-                      className="input"
-                      placeholder="Reason (required)"
-                      value={correctionReason}
-                      onChange={(e) => setCorrectionReason(e.target.value)}
-                    />
-                    <button className="btn btn-primary" onClick={saveCorrection} disabled={busy}>
-                      {busy ? "Saving..." : "Save correction"}
-                    </button>
-                    <button className="link-btn" onClick={() => setEditing(null)} disabled={busy}>
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
             </section>
 
             <section className="modal-section">
               <h3>Audit trail</h3>
               {adjustments.length === 0 ? (
-                <p className="field-hint">No corrections or min stock changes yet.</p>
+                <p className="field-hint">No edits, adjustments or min stock changes yet.</p>
               ) : (
                 <ul className="audit-list">
                   {adjustments.map((a) => (
@@ -329,6 +311,9 @@ export default function ProductHistory({ productId, onClose, onChanged }) {
           </>
         )}
       </div>
+      {editing && (
+        <MovementEditModal movement={editing} products={products} onClose={() => setEditing(null)} onSaved={afterEdit} />
+      )}
     </div>
   );
 }

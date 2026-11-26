@@ -12,6 +12,15 @@ const mongoose = require("mongoose");
 //   correctedQuantity 0 voids the movement.
 // kind "min_stock_change": records a minStock edit on a product.
 // kind "barcode_change": records setting, changing or clearing a barcode.
+// kind "stock_adjustment": a documented stock change that is not a delivery
+//   or a usage (opening stock that was never logged, count differences...).
+//   quantityDelta is part of the ledger: stock = in − out + Σ adjustments.
+//   `date` is the business date it applies to.
+// kind "cache_reconcile": the stored Product.quantity was aligned with the
+//   ledger (no ledger change); keeps previous/new stored values.
+// kind "movement_edit": date / product / note / source of a StockIn or
+//   StockOut was edited in place; `changes` holds { field: { from, to } }.
+//   (Quantity edits are recorded as movement_correction, as before.)
 const adjustmentSchema = new mongoose.Schema(
   {
     product: {
@@ -21,7 +30,14 @@ const adjustmentSchema = new mongoose.Schema(
     },
     kind: {
       type: String,
-      enum: ["movement_correction", "min_stock_change", "barcode_change"],
+      enum: [
+        "movement_correction",
+        "min_stock_change",
+        "barcode_change",
+        "stock_adjustment",
+        "cache_reconcile",
+        "movement_edit",
+      ],
       required: true
     },
 
@@ -46,6 +62,19 @@ const adjustmentSchema = new mongoose.Schema(
     previousBarcode: { type: String, default: undefined },
     newBarcode: { type: String, default: undefined },
 
+    // --- stock_adjustment ---
+    date: { type: Date, default: undefined },
+    unit: String,
+
+    // --- stock_adjustment / cache_reconcile ---
+    previousCachedQuantity: Number, // stored Product.quantity before
+    newCachedQuantity: Number, // stored Product.quantity after
+    ledgerQuantity: Number, // ledger balance at that moment (before the change)
+
+    // --- movement_edit ---
+    changes: { type: mongoose.Schema.Types.Mixed, default: undefined },
+    previousProduct: { type: mongoose.Schema.Types.ObjectId, ref: "Product", default: undefined },
+
     reason: {
       type: String,
       trim: true,
@@ -56,6 +85,11 @@ const adjustmentSchema = new mongoose.Schema(
 );
 
 adjustmentSchema.index({ product: 1, createdAt: -1 });
+// Ledger lookups of documented stock adjustments.
+adjustmentSchema.index(
+  { product: 1, date: 1 },
+  { name: "stock_adjustment_product_date", partialFilterExpression: { kind: "stock_adjustment" } }
+);
 // One revision number per movement: two concurrent corrections of the same
 // movement cannot both be based on the same previous value.
 adjustmentSchema.index(

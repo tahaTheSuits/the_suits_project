@@ -81,6 +81,7 @@ const summarize = (rows) => ({
   low: rows.filter((r) => r.status === "low").length,
   ok: rows.filter((r) => r.status === "ok").length,
   withUnitConflicts: rows.filter((r) => r.unitConflicts.length > 0).length,
+  ledgerMismatches: rows.filter((r) => r.reconciliation && !r.reconciliation.balanced).length,
 });
 
 exports.buildCurrentStockReport = async ({ includeArchived = false } = {}) => {

@@ -157,6 +157,15 @@ const conflictText = (row) => {
   return `${count} movement(s) in other units: ${detail}`;
 };
 
+const signedQty = (n) => (n > 0 ? `+${n}` : String(n));
+// Stored stock vs ledger (see utils/reconciliation.js).
+const ledgerCheckText = (row) => {
+  const r = row.reconciliation;
+  if (!r || r.balanced) return "Balanced";
+  if (r.current === null) return "Mismatch (no stored value)";
+  return `Mismatch ${signedQty(r.difference)} (stored ${r.current})`;
+};
+
 const CURRENT_STOCK_COLUMNS = [
   { header: "Product", width: 3, value: (r) => r.product + (r.isActive ? "" : " (archived)") },
   { header: "Barcode", width: 1.8, value: (r) => r.barcode || "", onlyIfAny: (rows) => rows.some((r) => r.barcode) },
@@ -164,7 +173,8 @@ const CURRENT_STOCK_COLUMNS = [
   { header: "Available", width: 1.2, align: "right", value: (r) => r.quantity },
   { header: "Min Stock", width: 1.4, align: "right", value: (r) => `${r.minStock}${r.minStockIsDefault ? " (default)" : ""}` },
   { header: "Status", width: 1.3, value: (r) => STATUS_TEXT[r.status] || r.status },
-  { header: "Unit conflict", width: 3, value: (r) => conflictText(r) || "No" },
+  { header: "Ledger check", width: 2, value: ledgerCheckText },
+  { header: "Unit conflict", width: 2.6, value: (r) => conflictText(r) || "No" },
 ];
 
 const currentStockFilename = (report, ext) =>
@@ -175,7 +185,8 @@ const currentStockLines = (report) => {
   return [
     `As of ${formatDateTime(report.generatedAt)}${report.includeArchived ? " · includes archived products" : ""}`,
     `${summary.products} products · ${summary.out} out of stock · ${summary.low} low · ${summary.ok} OK` +
-      (summary.withUnitConflicts ? ` · ${summary.withUnitConflicts} with unit conflicts` : ""),
+      (summary.withUnitConflicts ? ` · ${summary.withUnitConflicts} with unit conflicts` : "") +
+      (summary.ledgerMismatches ? ` · ${summary.ledgerMismatches} ledger mismatch(es)` : " · all balanced with the ledger"),
     "Quantities are in each product's own unit, with corrections applied",
   ];
 };
@@ -189,8 +200,8 @@ exports.exportCurrentStockExcel = exportHandler("Current stock Excel export", as
   currentStockLines(report).forEach((line) => sheet.addRow([line]).font = { color: { argb: "FF596460" } });
   sheet.addRow([]);
 
-  const headers = ["Product", "Barcode", "Unit", "Available", "Min Stock", "Min Stock Source", "Status", "Archived", "Unit Conflict"];
-  const widths = [32, 18, 10, 12, 12, 18, 14, 10, 50];
+  const headers = ["Product", "Barcode", "Unit", "Available", "Min Stock", "Min Stock Source", "Status", "Archived", "Unit Conflict", "Ledger Check", "Stored Stock", "Difference"];
+  const widths = [32, 18, 10, 12, 12, 18, 14, 10, 50, 26, 13, 12];
   const headerRow = sheet.addRow(headers);
   headerRow.font = { bold: true, color: { argb: "FFFFFFFF" } };
   headerRow.eachCell((cell) => {
@@ -209,6 +220,9 @@ exports.exportCurrentStockExcel = exportHandler("Current stock Excel export", as
       STATUS_TEXT[row.status] || row.status,
       row.isActive ? "No" : "Yes",
       conflictText(row) || "No",
+      ledgerCheckText(row),
+      row.reconciliation?.current ?? null,
+      row.reconciliation?.difference ?? null,
     ]);
     // Keep barcodes as text so Excel does not drop leading zeros.
     added.getCell(2).numFmt = "@";
@@ -272,6 +286,9 @@ const occupancyLines = (report) => {
     `Period: ${report.label} · business days in ${report.timeZone}`,
     `Occupancy data for ${s.daysWithOccupancy} of ${s.totalDays} days · service data for ${s.daysWithServicedApartments} · housekeeping data for ${s.daysWithHousekeeping}`,
     `Occupied apartment-nights: ${dash(s.occupiedApartmentNights)} · serviced apartments: ${dash(s.servicedApartments)} · housekeeping tasks: ${dash(s.housekeepingTasks)} · average occupancy: ${pct(s.averageOccupancyRate)}`,
+    ...(s.anomalyDays
+      ? [`Consumption alerts on ${s.anomalyDays} day(s): over ${s.anomalyFactor}× the period average per occupied apartment, or stock out on a day without occupancy / scheduled cleaning`]
+      : []),
     ...(s.daysNoScheduledCleaning || s.daysHoliday || s.daysSunday
       ? [`Sundays: ${s.daysSunday || 0} · holidays: ${s.daysHoliday || 0} · days without scheduled cleaning: ${s.daysNoScheduledCleaning || 0}`]
       : []),
@@ -294,7 +311,12 @@ const CONSUMPTION_COLUMNS = [
 
 const DAY_COLUMNS = [
   { header: "Date", width: 1.2, value: (d) => gbDay(d.date) },
-  { header: "Day", width: 1.6, muted: true, value: (d) => dayTypeText(d) || "–" },
+  {
+    header: "Day",
+    width: 1.6,
+    muted: true,
+    value: (d) => [dayTypeText(d), d.anomaly?.flagged ? "CONSUMPTION ALERT" : ""].filter(Boolean).join(" · ") || "–",
+  },
   {
     header: "Occupied / total",
     width: 1.4,
@@ -399,8 +421,9 @@ exports.exportOccupancyConsumptionExcel = exportHandler("Occupancy consumption E
       "Date", "Total apartments", "Occupied", "Vacant", "Check-ins", "Check-outs", "Serviced", "Housekeeping", "Laundry", "Water", "Source", "Note", "Stock out (by unit)",
       "Sunday", "Holiday", "Holiday name", "No scheduled cleaning", "No-service reason", "Paused service apartments",
       "Occupied apts", "Check-in apts", "Check-out apts", "Serviced apts", "Housekeeping apts", "Laundry apts", "Water apts", "Paused apts",
+      "Consumption alert",
     ],
-    [12, 16, 10, 9, 10, 11, 10, 13, 9, 8, 16, 30, 30, 9, 9, 22, 12, 30, 12, 28, 22, 22, 28, 22, 22, 22, 22],
+    [12, 16, 10, 9, 10, 11, 10, 13, 9, 8, 16, 30, 30, 9, 9, 22, 12, 30, 12, 28, 22, 22, 28, 22, 22, 22, 22, 60],
   );
   report.days.forEach((d) => {
     const [y, m, dd] = d.date.split("-").map(Number);
@@ -425,6 +448,7 @@ exports.exportOccupancyConsumptionExcel = exportHandler("Occupancy consumption E
       d.noServiceReason || "",
       d.pausedServiceApartments,
       ...BREAKDOWN_KEYS.map((k) => d.breakdown[k].join(", ")),
+      d.anomaly?.flagged ? d.anomaly.reasons.map((r) => r.message).join(" ") : "",
     ]);
     row.getCell(1).numFmt = "dd/mm/yyyy";
   });

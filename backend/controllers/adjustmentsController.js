@@ -249,9 +249,10 @@ exports.getProductMovements = async (req, res) => {
       },
     ];
 
-    const [ins, outs] = await Promise.all([
+    const [ins, outs, stockAdjustments] = await Promise.all([
       MOVEMENT_MODELS.in.aggregate(history("in")),
       MOVEMENT_MODELS.out.aggregate(history("out")),
+      Adjustment.find({ product: product._id, kind: "stock_adjustment" }).sort({ date: -1 }).limit(limit).lean(),
     ]);
 
     const shape = (movementType) => (m) => {
@@ -263,6 +264,10 @@ exports.getProductMovements = async (req, res) => {
         date: m.date,
         source: m.source,
         note: m.note,
+        productId: m.product,
+        updatedAt: m.updatedAt,
+        editedAt: m.editedAt || null,
+        editCount: m.editCount || 0,
         originalQuantity: m.quantity,
         originalUnit: unit,
         quantity: latest ? latest.correctedQuantity : m.quantity,
@@ -273,7 +278,23 @@ exports.getProductMovements = async (req, res) => {
       };
     };
 
-    const movements = [...ins.map(shape("in")), ...outs.map(shape("out"))].sort(
+    // Documented stock adjustments are part of the ledger: listed with the
+    // movements (read-only; they are corrected by another adjustment).
+    const adjustmentRows = stockAdjustments.map((a) => ({
+      _id: a._id,
+      movementType: "adjustment",
+      date: a.date || a.createdAt,
+      note: a.reason,
+      quantity: a.quantityDelta,
+      originalQuantity: a.quantityDelta,
+      originalUnit: productUnit,
+      unit: productUnit,
+      corrected: false,
+      unitConflict: false,
+      corrections: [],
+    }));
+
+    const movements = [...ins.map(shape("in")), ...outs.map(shape("out")), ...adjustmentRows].sort(
       (a, b) => new Date(b.date) - new Date(a.date),
     );
 
