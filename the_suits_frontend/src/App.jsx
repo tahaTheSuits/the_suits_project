@@ -1,7 +1,7 @@
 // src/App.jsx
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { setInventory } from "./features/inventory/inventorySlice.js";
+import { setInventory, upsertInventoryItem } from "./features/inventory/inventorySlice.js";
 import {
   api,
   UNITS,
@@ -80,6 +80,9 @@ function App() {
   const [searchTerm, setSearchTerm] = useState("");
   const [showArchived, setShowArchived] = useState(false);
   const [historyProductId, setHistoryProductId] = useState(null);
+  // Bumped after every successful inventory load (i.e. after every save),
+  // so reports that keep their own data (occupancy, period balance) refetch.
+  const [dataVersion, setDataVersion] = useState(0);
 
   // Only the latest load may write state; older/aborted responses are ignored.
   const loadSeqRef = useRef(0);
@@ -110,6 +113,7 @@ function App() {
       const data = inventoryResult.value.data;
       dispatch(setInventory(Array.isArray(data) ? data : []));
       setInventoryState({ data: [], loading: false, error: "", loaded: true });
+      setDataVersion((v) => v + 1);
     } else if (!isCanceled(inventoryResult.reason)) {
       console.error(inventoryResult.reason);
       setInventoryState((prev) => ({
@@ -146,6 +150,20 @@ function App() {
   }, [loadData]);
 
   const activeItems = useMemo(() => items.filter((item) => item.isActive !== false), [items]);
+
+  // Consumption alerts depend on each product's rule: any change to a basis or
+  // cap (including the immediate update after a save) changes this key.
+  const rulesSignature = useMemo(
+    () =>
+      items
+        .map((i) => `${i._id}:${i.consumptionBasis}:${i.consumptionBasisInferred ? 1 : 0}:${i.normalMaxThreshold ?? ""}`)
+        .join("|"),
+    [items],
+  );
+  const reportRefreshKey = `${dataVersion}#${rulesSignature}`;
+
+  // A saved product row from the server goes straight into shared state.
+  const handleProductUpdated = useCallback((row) => dispatch(upsertInventoryItem(row)), [dispatch]);
   const archivedCount = items.length - activeItems.length;
 
   const stats = useMemo(() => {
@@ -594,6 +612,7 @@ function App() {
           error: inventoryState.error,
         }}
         products={activeItems}
+        refreshKey={reportRefreshKey}
         onRetry={loadData}
         retrying={isLoading}
       />
@@ -601,6 +620,7 @@ function App() {
         <ProductHistory
           productId={historyProductId}
           products={activeItems}
+          onProductUpdated={handleProductUpdated}
           onClose={() => setHistoryProductId(null)}
           onChanged={loadData}
         />

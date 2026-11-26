@@ -49,7 +49,7 @@ const describeAdjustment = (a) => {
 
 const TYPE_LABEL = { in: "Stock in", out: "Stock out", adjustment: "Adjustment" };
 
-export default function ProductHistory({ productId, products = [], onClose, onChanged }) {
+export default function ProductHistory({ productId, products = [], onClose, onChanged, onProductUpdated }) {
   const [history, setHistory] = useState(null);
   const [adjustments, setAdjustments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -116,8 +116,11 @@ export default function ProductHistory({ productId, products = [], onClose, onCh
     setBusy(true);
     setNotice("");
     try {
-      await request();
+      const res = await request();
       setNotice(successText);
+      // The PATCH returns the updated product row: apply it to shared state
+      // right away (badges, rule tags, alert refresh), then reload everything.
+      if (res?.data?.product?._id) onProductUpdated?.(res.data.product);
       await Promise.all([load(), onChanged()]);
       return true;
     } catch (err) {

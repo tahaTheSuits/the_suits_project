@@ -3,35 +3,52 @@
 // verified against the ledger at the end of the period. When the period
 // reaches today, the closing balance is also compared with the stored stock
 // (✓ Balanced / ⚠ Mismatch, with the reconciliation breakdown on click).
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, getErrorMessage } from "../api.js";
 import LedgerCheck from "./LedgerCheck.jsx";
 
 const signed = (n) => (n > 0 ? `+${n}` : String(n));
 
-export default function PeriodBalance({ fromDate, toDate, rangeInvalid, periodLabel, onChanged }) {
+export default function PeriodBalance({ fromDate, toDate, rangeInvalid, periodLabel, onChanged, refreshKey }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const loadSeqRef = useRef(0);
+  const lastParamsRef = useRef(null); // params of the balance on screen
 
-  const load = async () => {
-    if (rangeInvalid) return setError("The From date must be on or before the To date.");
+  const fetchBalance = useCallback(async (params) => {
+    const seq = ++loadSeqRef.current;
     setLoading(true);
     setError("");
     try {
-      const res = await api.get("/api/reports/stock-balance", {
-        params: { from: fromDate || undefined, to: toDate || undefined },
-      });
+      const res = await api.get("/api/reports/stock-balance", { params });
+      if (seq !== loadSeqRef.current) return;
       setData(res.data);
+      lastParamsRef.current = params;
     } catch (err) {
-      setError(getErrorMessage(err, "Failed to load the stock balance"));
+      if (seq === loadSeqRef.current) setError(getErrorMessage(err, "Failed to load the stock balance"));
     } finally {
-      setLoading(false);
+      if (seq === loadSeqRef.current) setLoading(false);
     }
+  }, []);
+
+  const load = async () => {
+    if (rangeInvalid) return setError("The From date must be on or before the To date.");
+    await fetchBalance({ from: fromDate || undefined, to: toDate || undefined });
   };
 
+  // Stock or product data changed elsewhere: refetch the balance on screen.
+  useEffect(() => {
+    if (!refreshKey) return undefined;
+    const timer = setTimeout(() => {
+      if (lastParamsRef.current) fetchBalance(lastParamsRef.current);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [refreshKey, fetchBalance]);
+
+  // onChanged reloads the inventory, which bumps refreshKey and refetches.
   const afterReconcile = async () => {
-    await Promise.all([load(), onChanged?.()]);
+    await onChanged?.();
   };
 
   return (

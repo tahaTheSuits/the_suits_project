@@ -1,7 +1,7 @@
 // Consumption vs occupancy: daily occupancy / housekeeping records (synced
 // from the admin dashboard or entered manually) combined with corrected stock
 // out per product. Collapsed by default so it adds no requests on page load.
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api, basisInfo, downloadFile, getErrorMessage, rangeSlug } from "../api.js";
 import { dayBadge } from "../dayStatus.js";
 import DayDetailsModal, { DashboardLink } from "./DayDetailsModal.jsx";
@@ -47,7 +47,11 @@ function MetricCell({ metric, unit }) {
   );
 }
 
-export default function OccupancyPanel() {
+// Delay before a background refresh, so a burst of changes (save -> row
+// update -> full reload) results in a single request.
+const REFRESH_DELAY_MS = 250;
+
+export default function OccupancyPanel({ refreshKey }) {
   const [open, setOpen] = useState(false);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -61,26 +65,47 @@ export default function OccupancyPanel() {
   const [syncing, setSyncing] = useState(false);
   const [forceSync, setForceSync] = useState(false);
   const [syncResult, setSyncResult] = useState(null); // { ok, message, details? }
-  const [detailsDay, setDetailsDay] = useState(null);
-  const closeDetails = useCallback(() => setDetailsDay(null), []);
+  // Only the date is kept: the modal always gets the current report's row,
+  // so a refreshed report (new rules / data) updates an open modal too.
+  const [detailsDate, setDetailsDate] = useState(null);
+  const setDetailsDay = useCallback((day) => setDetailsDate(day ? day.date : null), []);
+  const closeDetails = useCallback(() => setDetailsDate(null), []);
+  const detailsDay = detailsDate ? report?.days.find((d) => d.date === detailsDate) || null : null;
+
+  const loadSeqRef = useRef(0);
+  const lastRangeRef = useRef(null); // range of the report on screen
 
   const rangeInvalid = Boolean(fromDate && toDate && fromDate > toDate);
   const params = { from: fromDate || undefined, to: toDate || undefined };
 
   const load = useCallback(async (from, to) => {
+    const seq = ++loadSeqRef.current;
     setLoading(true);
     setError("");
     try {
       const res = await api.get("/api/reports/occupancy-consumption", {
         params: { from: from || undefined, to: to || undefined },
       });
+      if (seq !== loadSeqRef.current) return; // a newer load is on its way
       setReport(res.data);
+      lastRangeRef.current = { from: res.data.from, to: res.data.to };
     } catch (err) {
-      setError(getErrorMessage(err, "Failed to load the occupancy report"));
+      if (seq === loadSeqRef.current) setError(getErrorMessage(err, "Failed to load the occupancy report"));
     } finally {
-      setLoading(false);
+      if (seq === loadSeqRef.current) setLoading(false);
     }
   }, []);
+
+  // Product rules or warehouse data changed elsewhere (e.g. a consumption
+  // rule saved in History): refetch the report on screen for the same days.
+  useEffect(() => {
+    if (!refreshKey) return undefined;
+    const timer = setTimeout(() => {
+      const range = lastRangeRef.current;
+      if (range) load(range.from, range.to);
+    }, REFRESH_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [refreshKey, load]);
 
   const toggle = () => {
     const next = !open;

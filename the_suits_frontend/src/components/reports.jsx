@@ -90,7 +90,7 @@ function ReportTable({ title, type, section, onRetry, retrying, onEdit }) {
   );
 }
 
-export default function Reports({ sections, stock, products = [], onRetry, retrying }) {
+export default function Reports({ sections, stock, products = [], refreshKey, onRetry, retrying }) {
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(null);
   const [notice, setNotice] = useState("");
@@ -158,7 +158,7 @@ export default function Reports({ sections, stock, products = [], onRetry, retry
     <div className="reports-container">
       <h1 className="reports-title">Reports Dashboard</h1>
       <CurrentStockReport {...stock} onRetry={onRetry} />
-      <OccupancyPanel />
+      <OccupancyPanel refreshKey={refreshKey} />
 
       {error && <p className="reports-error">{error}</p>}
       {notice && <p className="modal-notice">{notice}</p>}
@@ -205,6 +205,7 @@ export default function Reports({ sections, stock, products = [], onRetry, retry
       </div>
 
       <PeriodBalance
+        refreshKey={refreshKey}
         fromDate={fromDate}
         toDate={toDate}
         rangeInvalid={rangeInvalid}
