@@ -8,6 +8,8 @@ import CurrentStockReport from "./CurrentStockReport.jsx";
 import OccupancyPanel from "./OccupancyPanel.jsx";
 import MovementEditModal from "./MovementEditModal.jsx";
 import PeriodBalance from "./PeriodBalance.jsx";
+import PeriodLockControl from "./PeriodLockControl.jsx";
+import { isLockedDate, usePeriodLock } from "../periodLock.js";
 import "./reports.css";
 
 const SECTIONS = [
@@ -21,6 +23,7 @@ const formatDate = (date) => new Date(date).toLocaleDateString("en-GB");
 
 function ReportTable({ title, type, section, onRetry, retrying, onEdit }) {
   const { data, loading, error, loaded } = section;
+  const lock = usePeriodLock();
 
   return (
     <>
@@ -74,7 +77,11 @@ function ReportTable({ title, type, section, onRetry, retrying, onEdit }) {
                   <td data-label="Unit">{item.unit}</td>
                   <td data-label="">
                     {item.editedAt && <span className="corrected-tag" title="This entry was edited">edited</span>}
-                    {item.product && (
+                    {isLockedDate(item.date, lock.lockedThroughDate) ? (
+                      <span className="lock-badge" title={`Locked: the period is closed through ${lock.lockedThroughDate}`}>
+                        🔒 locked
+                      </span>
+                    ) : item.product && (
                       <button className="link-btn" onClick={() => onEdit(type, item)}>
                         Edit
                       </button>
@@ -157,6 +164,9 @@ export default function Reports({ sections, stock, products = [], refreshKey, on
   return (
     <div className="reports-container">
       <h1 className="reports-title">Reports Dashboard</h1>
+      <div className="reports-lock">
+        <PeriodLockControl />
+      </div>
       <CurrentStockReport {...stock} onRetry={onRetry} />
       <OccupancyPanel refreshKey={refreshKey} />
 

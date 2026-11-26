@@ -8,11 +8,13 @@ const { diagnoseProduct, reconcileProduct, ReconcileError } = require("../utils/
 const { buildPeriodBalance } = require("../utils/periodBalance");
 const { editMovement, MovementEditError } = require("../utils/movementEdit");
 const { ExportError } = require("../utils/exportHelpers");
+const { sendIfLocked } = require("../utils/periodLock");
 
 const handle = (label, fn) => async (req, res) => {
   try {
     await fn(req, res);
   } catch (err) {
+    if (sendIfLocked(res, err)) return;
     if (err instanceof ReconcileError) return res.status(err.status).json({ message: err.message, ...err.extra });
     if (err instanceof MovementEditError || err instanceof ExportError) {
       return res.status(err.status).json({ message: err.message });

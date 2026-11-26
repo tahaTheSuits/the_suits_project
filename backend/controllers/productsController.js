@@ -5,6 +5,7 @@ const Adjustment = require("../models/adjustmentModel");
 const { DEFAULT_UNIT, UNITS, normalizeUnit } = require("../utils/units");
 const { DEFAULT_MIN_STOCK, computeLedger, toStockRow } = require("../utils/stock");
 const { BARCODE_COLLATION, normalizeBarcode, validateBarcode } = require("../utils/barcode");
+const { assertNotLocked, sendIfLocked } = require("../utils/periodLock");
 const {
   consumptionRuleOf,
   inferConsumptionBasis,
@@ -85,6 +86,16 @@ exports.createProduct = async (req, res) => {
     // Optional: products without a barcode work exactly as before.
     const barcodeResult = validateBarcode(barcode);
     if (barcodeResult.error) return res.status(400).json({ message: barcodeResult.error });
+
+    // The initial quantity becomes a Stock In dated now.
+    if (initialQtyValue > 0) {
+      try {
+        await assertNotLocked(new Date(), "log an initial stock");
+      } catch (err) {
+        if (sendIfLocked(res, err)) return;
+        throw err;
+      }
+    }
 
     const existingProduct = await findActiveByName(trimmedName);
     if (existingProduct) {

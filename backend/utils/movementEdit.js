@@ -21,6 +21,7 @@ const Product = require("../models/productModel");
 const Adjustment = require("../models/adjustmentModel");
 const { DEFAULT_UNIT, normalizeUnit } = require("./units");
 const { MOVEMENT_MODELS, computeLedger, productUnitOf, roundQty } = require("./stock");
+const { assertNotLocked } = require("./periodLock");
 
 const REASON_MIN = 3;
 const REASON_MAX = 500;
@@ -139,6 +140,11 @@ async function editMovement(movementType, id, body = {}) {
   }
 
   if (newQty === undefined && Object.keys(fieldChanges).length === 0) fail(400, "Nothing changed.");
+
+  // Period lock: neither the entry's current date nor its new date may be
+  // inside the locked period.
+  await assertNotLocked(movement.date || new Date(), "edit an entry");
+  if (set.date) await assertNotLocked(set.date, "move an entry to a date");
 
   // ---- stock deltas per product ----
   const target = newProduct || oldProduct;

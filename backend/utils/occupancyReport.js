@@ -25,6 +25,13 @@ const { latestCorrectionLookup, EFFECTIVE_QUANTITY, IS_CORRECTED, productUnitOf 
 const { businessTimeZone, paddedUtcWindow, resolveDayRange } = require("./businessDay");
 const { normalizeMeta } = require("./occupancyMeta");
 const { consumptionRuleOf, BASIS_LABELS } = require("./consumptionRule");
+const {
+  previousPeriodOf,
+  changeOf,
+  stockOutByProduct,
+  periodLabel,
+  SIGNIFICANT_INCREASE_PCT,
+} = require("./periodComparison");
 
 const OCCUPANCY_FIELDS = [
   "totalApartments",
@@ -172,7 +179,9 @@ async function buildOccupancyConsumptionReport(query = {}) {
   const timeZone = businessTimeZone();
   const window = paddedUtcWindow(range.from, range.to);
 
-  const [rows, occupancyRecords] = await Promise.all([
+  const previous = previousPeriodOf(range.from, range.to);
+
+  const [rows, occupancyRecords, previousOut] = await Promise.all([
     StockOut.aggregate([
       { $match: { date: { $gte: window.start, $lt: window.end } } },
       { $addFields: { businessDay: { $dateToString: { format: "%Y-%m-%d", date: "$date", timezone: timeZone } } } },
@@ -187,9 +196,11 @@ async function buildOccupancyConsumptionReport(query = {}) {
       },
     ]),
     Occupancy.find({ date: { $gte: range.from, $lte: range.to } }).sort({ date: 1 }).lean(),
+    stockOutByProduct(previous, timeZone),
   ]);
 
-  const productIds = [...new Set(rows.map((r) => String(r._id.product)))];
+  // Products used in either period (previous-only products show a drop to 0).
+  const productIds = [...new Set([...rows.map((r) => String(r._id.product)), ...previousOut.keys()])];
   const products = await Product.find({ _id: { $in: productIds } }).lean();
   const productById = new Map(products.map((p) => [String(p._id), p]));
   const occupancyByDay = new Map(occupancyRecords.map((r) => [r.date, r]));
@@ -259,10 +270,59 @@ async function buildOccupancyConsumptionReport(query = {}) {
       outWithoutOccupancy: round(outWithoutOccupancy),
       unitConflicts: entry.unitConflicts,
       alertRule: entry.rule,
+      previousOut: previousOut.get(id) || 0,
+      change: changeOf(totalOut, previousOut.get(id) || 0),
       ...metrics,
     };
   });
+  const productsWithStockOut = productRows.length;
+
+  // Used only in the previous period: listed with 0 this period.
+  previousOut.forEach((qty, id) => {
+    if (perProduct.has(id) || qty <= 0) return;
+    const product = productById.get(id);
+    const rule = consumptionRuleOf(product || {});
+    productRows.push({
+      productId: id,
+      product: product?.name || "Unknown product",
+      archived: product?.isActive === false,
+      barcode: product?.barcode || null,
+      unit: product ? productUnitOf(product) : DEFAULT_UNIT,
+      totalOut: 0,
+      movements: 0,
+      daysWithStockOut: 0,
+      outWithoutOccupancy: 0,
+      unitConflicts: 0,
+      alertRule: { ...rule, basisLabel: BASIS_LABELS[rule.basis].rate, average: null, averageDays: 0 },
+      previousOut: qty,
+      change: changeOf(0, qty),
+      previousOnly: true,
+      ...Object.fromEntries(METRICS.map((m) => [m.key, computeMetric(m, new Map(), occupancyByDay, totalDays)])),
+    });
+  });
   productRows.sort((a, b) => a.product.localeCompare(b.product, "en", { sensitivity: "base" }));
+
+  // Period-over-period totals per unit (units are never added together).
+  const unitTotals = new Map();
+  productRows.forEach((r) => {
+    const t = unitTotals.get(r.unit) || { unit: r.unit, current: 0, previous: 0 };
+    t.current = round(t.current + r.totalOut);
+    t.previous = round(t.previous + r.previousOut);
+    unitTotals.set(r.unit, t);
+  });
+  const comparison = {
+    from: previous.from,
+    to: previous.to,
+    label: periodLabel(previous),
+    kind: previous.kind,
+    days: previous.days,
+    months: previous.months || null,
+    significantIncreasePct: SIGNIFICANT_INCREASE_PCT,
+    byUnit: [...unitTotals.values()].map((t) => ({ ...t, change: changeOf(t.current, t.previous) })),
+    increased: productRows.filter((r) => ["up", "high", "new"].includes(r.change.trend)).length,
+    decreased: productRows.filter((r) => r.change.trend === "down").length,
+    unchanged: productRows.filter((r) => r.change.trend === "same").length,
+  };
 
   // Per day: occupancy record (or nulls) + stock out totals by unit.
   const dayOut = new Map();
@@ -315,7 +375,7 @@ async function buildOccupancyConsumptionReport(query = {}) {
     checkIns: sumKnown(recordsInRange, "checkIns"),
     checkOuts: sumKnown(recordsInRange, "checkOuts"),
     averageOccupancyRate: totalForRate > 0 ? round(occupiedForRate / totalForRate, 4) : null,
-    productsWithStockOut: productRows.length,
+    productsWithStockOut,
     daysSunday: days.filter((d) => d.isSunday).length,
     daysHoliday: days.filter((d) => d.isHoliday).length,
     daysNoScheduledCleaning: days.filter((d) => d.noScheduledCleaning).length,
@@ -333,6 +393,7 @@ async function buildOccupancyConsumptionReport(query = {}) {
     generatedAt: new Date(),
     formulas: FORMULAS,
     summary,
+    comparison,
     products: productRows,
     days,
   };

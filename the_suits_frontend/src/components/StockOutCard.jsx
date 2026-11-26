@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, cameraScanSupported, getErrorMessage, lookupBarcode, newRequestId, sleep } from "../api.js";
 import CameraScanner from "./CameraScanner.jsx";
+import { isTodayLocked, lockMessage, usePeriodLock } from "../periodLock.js";
 
 const DUPLICATE_SCAN_MS = 1000;
 
@@ -35,6 +36,8 @@ export default function StockOutCard({ activeItems, onRecorded, setMessage }) {
   const lookupRef = useRef({ inFlight: false, code: "", at: 0 });
   const pendingRequestIdRef = useRef(null);
   const cameUsingScanRef = useRef(false);
+  const lock = usePeriodLock();
+  const todayLocked = isTodayLocked(lock);
 
   // Prefer fresh inventory data; fall back to the lookup result if the
   // product is not in the loaded list yet.
@@ -222,8 +225,9 @@ export default function StockOutCard({ activeItems, onRecorded, setMessage }) {
           {item.barcode ? ` · barcode ${item.barcode}` : ""}
         </p>
       )}
+      {todayLocked && <p className="lock-warning">🔒 {lockMessage(lock.lockedThroughDate)}</p>}
       <div className="card-actions">
-        <button onClick={submit} className="btn btn-danger" style={{ width: "110px" }} disabled={saving}>
+        <button onClick={submit} className="btn btn-danger" style={{ width: "110px" }} disabled={saving || todayLocked}>
           {saving ? "Saving..." : "Remove"}
         </button>
       </div>

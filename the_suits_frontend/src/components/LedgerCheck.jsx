@@ -4,6 +4,7 @@
 // with the ledger, or log a documented stock adjustment).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, getErrorMessage } from "../api.js";
+import { isTodayLocked, lockMessage, usePeriodLock } from "../periodLock.js";
 
 const signed = (n) => (n > 0 ? `+${n}` : String(n));
 const formatDate = (date) => new Date(date).toLocaleDateString("en-GB");
@@ -82,6 +83,8 @@ export function ReconcileModal({ productId, productName, onClose, onChanged }) {
   const [reason, setReason] = useState("");
   const [delta, setDelta] = useState("");
   const closeRef = useRef(null);
+  const lock = usePeriodLock();
+  const todayLocked = isTodayLocked(lock);
 
   const load = useCallback(async () => {
     try {
@@ -189,6 +192,9 @@ export function ReconcileModal({ productId, productName, onClose, onChanged }) {
 
             <section className="modal-section">
               <h3>Reconcile</h3>
+              {todayLocked && (
+                <p className="lock-warning">🔒 {lockMessage(lock.lockedThroughDate)} Reconciling takes effect today, so it is blocked.</p>
+              )}
               <label className="reconcile-reason">
                 Reason (saved in the audit trail)
                 <input
@@ -206,7 +212,7 @@ export function ReconcileModal({ productId, productName, onClose, onChanged }) {
                     Use when the movements are right and the stored number is wrong. Stored {r.current} → {r.expected}{" "}
                     {unit}; no movement is added.
                   </p>
-                  <button className="btn btn-primary" onClick={() => apply("align_stock")} disabled={busy || r.balanced}>
+                  <button className="btn btn-primary" onClick={() => apply("align_stock")} disabled={busy || r.balanced || todayLocked}>
                     {busy ? "Saving..." : "Align with ledger"}
                   </button>
                 </div>
@@ -227,7 +233,7 @@ export function ReconcileModal({ productId, productName, onClose, onChanged }) {
                       disabled={busy}
                       aria-label="Adjustment quantity"
                     />
-                    <button className="btn btn-primary" onClick={() => apply("log_adjustment")} disabled={busy}>
+                    <button className="btn btn-primary" onClick={() => apply("log_adjustment")} disabled={busy || todayLocked}>
                       {busy ? "Saving..." : "Log adjustment"}
                     </button>
                   </div>

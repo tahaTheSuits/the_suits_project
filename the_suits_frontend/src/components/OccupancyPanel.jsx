@@ -24,6 +24,24 @@ const METRICS = [
 ];
 
 const gb = (key) => key.split("-").reverse().join("/");
+
+const TREND_TITLE = {
+  down: "Less used than in the previous period",
+  same: "Same as the previous period",
+  up: "More used than in the previous period",
+  high: "Significantly more used than in the previous period",
+  new: "Not used in the previous period",
+};
+
+function ChangeBadge({ change }) {
+  if (!change) return null;
+  return (
+    <span className={`pop-badge ${change.trend}`} title={TREND_TITLE[change.trend]}>
+      {change.trend === "down" ? "▼ " : change.trend === "up" || change.trend === "high" ? "▲ " : ""}
+      {change.label}
+    </span>
+  );
+}
 const dash = (v) => (v === null || v === undefined ? "–" : v);
 
 function MetricCell({ metric, unit }) {
@@ -345,10 +363,44 @@ export default function OccupancyPanel({ refreshKey }) {
                 )}
               </p>
 
+              {report.comparison && (
+                <>
+                  <h3 className="occupancy-subtitle">
+                    Compared with the previous {report.comparison.kind === "months" ? (report.comparison.months === 1 ? "month" : `${report.comparison.months} months`) : `${report.comparison.days} days`}{" "}
+                    <span className="muted">({report.comparison.label})</span>
+                  </h3>
+                  <div className="pop-cards">
+                    {report.comparison.byUnit.length === 0 ? (
+                      <p className="field-hint">No stock out in either period.</p>
+                    ) : (
+                      report.comparison.byUnit.map((t) => (
+                        <div key={t.unit} className="pop-card">
+                          <div className="pop-unit">Stock out · {t.unit}</div>
+                          <div className="pop-values">
+                            {t.current}
+                            <ChangeBadge change={t.change} />
+                          </div>
+                          <div className="pop-prev">previous {t.previous}</div>
+                        </div>
+                      ))
+                    )}
+                    <div className="pop-card">
+                      <div className="pop-unit">Products</div>
+                      <div className="pop-values">
+                        <span className="pop-badge high" title="More used (including new)">▲ {report.comparison.increased}</span>
+                        <span className="pop-badge down" title="Less used">▼ {report.comparison.decreased}</span>
+                        <span className="pop-badge same" title="Unchanged">= {report.comparison.unchanged}</span>
+                      </div>
+                      <div className="pop-prev">increase of {report.comparison.significantIncreasePct}%+ shown in red</div>
+                    </div>
+                  </div>
+                </>
+              )}
+
               <h3 className="occupancy-subtitle">Consumption by product</h3>
               <div className="table-wrapper">
                 {report.products.length === 0 ? (
-                  <p className="loading-state">No stock out in this period.</p>
+                  <p className="loading-state">No stock out in this period or the previous one.</p>
                 ) : (
                   <table className="reports-table">
                     <thead>
@@ -356,6 +408,8 @@ export default function OccupancyPanel({ refreshKey }) {
                         <th>Product</th>
                         <th>Unit</th>
                         <th>Total out</th>
+                        <th>Previous</th>
+                        <th>Change</th>
                         {METRICS.map((m) => (
                           <th key={m.key}>{m.label}</th>
                         ))}
@@ -386,6 +440,10 @@ export default function OccupancyPanel({ refreshKey }) {
                           </td>
                           <td data-label="Unit">{p.unit}</td>
                           <td data-label="Total out">{p.totalOut}</td>
+                          <td data-label="Previous">{p.previousOut ?? "–"}</td>
+                          <td data-label="Change">
+                            <ChangeBadge change={p.change} />
+                          </td>
                           {METRICS.map((m) => (
                             <td key={m.key} data-label={m.label}>
                               <MetricCell metric={p[m.key]} unit={p.unit} />

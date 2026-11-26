@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, getErrorMessage } from "../api.js";
 import LedgerCheck from "./LedgerCheck.jsx";
+import PeriodLockControl from "./PeriodLockControl.jsx";
 
 const signed = (n) => (n > 0 ? `+${n}` : String(n));
 
@@ -56,6 +57,7 @@ export default function PeriodBalance({ fromDate, toDate, rangeInvalid, periodLa
       <div className="current-stock-header">
         <h2 className="reports-section-title">Stock balance for the period</h2>
         <div className="current-stock-actions">
+          <PeriodLockControl />
           <button onClick={load} disabled={loading || rangeInvalid}>
             {loading ? "Checking..." : data ? "Refresh" : "Check balance"}
           </button>

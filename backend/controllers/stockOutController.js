@@ -2,6 +2,7 @@
 const StockOut = require("../models/stockOutModel");
 const { resolveMovementInput, MovementError } = require("../utils/movements");
 const { availableFor, syncQuantityCache } = require("../utils/stock");
+const { assertNotLocked, sendIfLocked } = require("../utils/periodLock");
 
 const readRequestId = (value) =>
   typeof value === "string" && value.trim() ? value.trim().slice(0, 100) : undefined;
@@ -49,6 +50,10 @@ exports.createStockOut = async (req, res) => {
       if (existing) return duplicateResponse(res, existing, product, qty);
     }
 
+    // Movements are dated now: refused if the period lock covers today.
+    const date = new Date();
+    await assertNotLocked(date, "record a stock out");
+
     const available = await availableFor(product);
     if (qty > available) {
       return res.status(400).json({
@@ -61,7 +66,7 @@ exports.createStockOut = async (req, res) => {
       stockOut = await StockOut.create({
         product: product._id,
         quantity: qty,
-        date: new Date(),
+        date,
         unit: productUnit,
         note: note || "",
         ...(clientRequestId ? { clientRequestId } : {}),
@@ -101,6 +106,7 @@ exports.createStockOut = async (req, res) => {
       },
     });
   } catch (err) {
+    if (sendIfLocked(res, err)) return;
     if (err instanceof MovementError) {
       return res.status(err.status).json({ message: err.message });
     }

@@ -31,6 +31,8 @@ const {
   roundQty,
 } = require("./stock");
 
+const { assertNotLocked } = require("./periodLock");
+
 const DUPLICATE_WINDOW_MS = 5 * 60 * 1000;
 const INITIAL_STOCK_WINDOW_MS = 2 * 60 * 1000;
 const REASON_MIN = 3;
@@ -274,6 +276,8 @@ async function reconcileProduct(productId, body = {}) {
 
   const product = await Product.findById(productId).lean();
   if (!product) throw new ReconcileError(404, "Product not found.");
+  // Both fixes take effect today.
+  await assertNotLocked(new Date(), action === "align_stock" ? "align stored stock" : "log a stock adjustment");
   const unit = productUnitOf(product);
   const ledger = (await computeLedger([product])).get(String(product._id));
   const recon = reconciliationOf(product, ledger.quantity);

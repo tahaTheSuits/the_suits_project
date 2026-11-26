@@ -5,6 +5,7 @@
 // duplicate delivery or usage is created.
 import { useEffect, useRef, useState } from "react";
 import { api, getErrorMessage } from "../api.js";
+import { isLockedDate, usePeriodLock } from "../periodLock.js";
 
 const pad = (n) => String(n).padStart(2, "0");
 // Date -> "YYYY-MM-DDTHH:mm" in local time (datetime-local input value).
@@ -33,6 +34,9 @@ export default function MovementEditModal({ movement, products = [], onClose, on
   const savingRef = useRef(false);
   const firstFieldRef = useRef(null);
   const isIn = movement.movementType === "in";
+  const lock = usePeriodLock();
+  const originalLocked = isLockedDate(movement.date, lock.lockedThroughDate);
+  const newDateLocked = !originalLocked && form.date && isLockedDate(form.date.slice(0, 10), lock.lockedThroughDate);
 
   useEffect(() => {
     firstFieldRef.current?.focus();
@@ -66,6 +70,7 @@ export default function MovementEditModal({ movement, products = [], onClose, on
 
   const save = async () => {
     if (savingRef.current) return;
+    if (originalLocked || newDateLocked) return setError(`The period is locked through ${lock.lockedThroughDate}.`);
     if (!changed.length) return setError("Nothing changed.");
     if (!qtyValid) return setError("Quantity must be 0 or more (0 voids the entry).");
     if (!form.date) return setError("Choose a date.");
@@ -112,6 +117,16 @@ export default function MovementEditModal({ movement, products = [], onClose, on
           </button>
         </div>
         {error && <p className="section-error">{error}</p>}
+        {originalLocked && (
+          <p className="lock-warning">
+            🔒 This entry is in a locked period (closed through {lock.lockedThroughDate}) and cannot be edited.
+          </p>
+        )}
+        {newDateLocked && (
+          <p className="lock-warning">
+            🔒 The new date is inside the locked period (closed through {lock.lockedThroughDate}). Choose a later date.
+          </p>
+        )}
 
         <div className="occupancy-grid edit-grid">
           <label>
@@ -130,7 +145,14 @@ export default function MovementEditModal({ movement, products = [], onClose, on
           </label>
           <label>
             Date and time
-            <input className="input" type="datetime-local" value={form.date} onChange={set("date")} disabled={busy} />
+            <input
+              className="input"
+              type="datetime-local"
+              value={form.date}
+              onChange={set("date")}
+              disabled={busy || originalLocked}
+              min={lock.lockedThroughDate ? `${lock.lockedThroughDate}T23:59` : undefined}
+            />
           </label>
           {isIn && (
             <label>
@@ -166,7 +188,7 @@ export default function MovementEditModal({ movement, products = [], onClose, on
         </p>
 
         <div className="card-actions">
-          <button className="btn btn-primary" onClick={save} disabled={busy || !changed.length}>
+          <button className="btn btn-primary" onClick={save} disabled={busy || !changed.length || originalLocked || newDateLocked}>
             {busy ? "Saving..." : "Save changes"}
           </button>
           <button className="link-btn" onClick={onClose} disabled={busy}>

@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, basisInfo, CONSUMPTION_BASES, getErrorMessage, inferConsumptionBasis, NO_LIMIT_HELP } from "../api.js";
 import MovementEditModal from "./MovementEditModal.jsx";
+import { isLockedDate, usePeriodLock } from "../periodLock.js";
 
 const formatDate = (date) => new Date(date).toLocaleDateString("en-GB");
 const formatDateTime = (date) =>
@@ -58,6 +59,7 @@ export default function ProductHistory({ productId, products = [], onClose, onCh
   const [busy, setBusy] = useState(false);
 
   const [editing, setEditing] = useState(null); // movement being edited
+  const lock = usePeriodLock();
 
   const [minStockInput, setMinStockInput] = useState("");
   const [minStockReason, setMinStockReason] = useState("");
@@ -361,10 +363,16 @@ export default function ProductHistory({ productId, products = [], onClose, onCh
                           )}
                         </td>
                         <td data-label="">
-                          {m.movementType !== "adjustment" && (
-                            <button className="link-btn" onClick={() => startEdit(m)} disabled={busy}>
-                              Edit
-                            </button>
+                          {isLockedDate(m.date, lock.lockedThroughDate) ? (
+                            <span className="lock-badge" title={`Locked: the period is closed through ${lock.lockedThroughDate}`}>
+                              🔒 locked
+                            </span>
+                          ) : (
+                            m.movementType !== "adjustment" && (
+                              <button className="link-btn" onClick={() => startEdit(m)} disabled={busy}>
+                                Edit
+                              </button>
+                            )
                           )}
                         </td>
                       </tr>

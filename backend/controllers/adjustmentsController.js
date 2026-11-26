@@ -15,6 +15,8 @@ const {
   productUnitOf,
 } = require("../utils/stock");
 
+const { assertNotLocked, sendIfLocked } = require("../utils/periodLock");
+
 const REASON_MIN = 3;
 const REASON_MAX = 500;
 const isDuplicateKeyError = (err) => err && err.code === 11000;
@@ -51,6 +53,12 @@ exports.createMovementCorrection = async (req, res) => {
 
     const movement = await Model.findById(movementId).lean();
     if (!movement) return res.status(404).json({ message: "Movement not found." });
+    try {
+      await assertNotLocked(movement.date, "correct an entry");
+    } catch (err) {
+      if (sendIfLocked(res, err)) return;
+      throw err;
+    }
 
     const product = await Product.findById(movement.product).lean();
     if (!product) {

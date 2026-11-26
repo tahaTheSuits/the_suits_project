@@ -41,6 +41,7 @@ app.use('/api/export', reportExportRoute);
 app.use('/api/adjustments', adjustmentsRoute);
 app.use('/api/occupancy', occupancyRoute);
 app.use('/api/movements', require('./routes/movementsRoute'));
+app.use('/api/settings', require('./routes/settingsRoute'));
 //app.use('/api/export', reportExportRoute);
 
 

@@ -289,9 +289,25 @@ const productNotes = (row) =>
     .filter(Boolean)
     .join("; ");
 
+const changeText = (c) => (c ? c.label : "");
+
+// "Previous period 01/10/2026 – 31/10/2026: pcs 120 -> 96 (-20%) · gallon ..."
+const comparisonLines = (report) => {
+  const c = report.comparison;
+  if (!c) return [];
+  const totals = c.byUnit.length
+    ? c.byUnit.map((t) => `${t.unit} ${t.previous} → ${t.current} (${t.change.label})`).join(" · ")
+    : "no stock out in either period";
+  return [
+    `Compared with the previous ${c.kind === "months" ? `${c.months} calendar month(s)` : `${c.days} days`} (${c.label}): ${totals}`,
+    `${c.increased} product(s) up, ${c.decreased} down, ${c.unchanged} unchanged · increases of ${c.significantIncreasePct}% or more are significant`,
+  ];
+};
+
 const occupancyLines = (report) => {
   const s = report.summary;
   return [
+    ...comparisonLines(report),
     `Period: ${report.label} · business days in ${report.timeZone}`,
     `Occupancy data for ${s.daysWithOccupancy} of ${s.totalDays} days · service data for ${s.daysWithServicedApartments} · housekeeping data for ${s.daysWithHousekeeping}`,
     `Occupied apartment-nights: ${dash(s.occupiedApartmentNights)} · serviced apartments: ${dash(s.servicedApartments)} · housekeeping tasks: ${dash(s.housekeepingTasks)} · average occupancy: ${pct(s.averageOccupancyRate)}`,
@@ -345,6 +361,25 @@ const DAY_COLUMNS = [
   { header: "Stock out", width: 1.9, value: (d) => unitTotals(d.stockOutByUnit) },
 ];
 
+const TREND_TEXT = { down: "Lower", same: "Unchanged", up: "Higher", high: "Significantly higher", new: "New this period" };
+const TREND_COLUMNS = [
+  { header: "Product", width: 3, value: (r) => r.product + (r.archived ? " (archived)" : "") },
+  { header: "Unit", width: 0.9, value: (r) => r.unit },
+  { header: "Previous period", width: 1.4, align: "right", value: (r) => r.previousOut },
+  { header: "This period", width: 1.4, align: "right", value: (r) => r.totalOut },
+  { header: "Change", width: 1.2, align: "right", value: (r) => changeText(r.change) },
+  { header: "Trend", width: 2, muted: true, value: (r) => TREND_TEXT[r.change.trend] || "" },
+];
+// Biggest increases first, then the rest by name.
+const TREND_ORDER = { high: 0, new: 1, up: 2, same: 3, down: 4 };
+const trendRows = (report) =>
+  [...report.products].sort(
+    (a, b) =>
+      TREND_ORDER[a.change.trend] - TREND_ORDER[b.change.trend] ||
+      (b.change.pct ?? 0) - (a.change.pct ?? 0) ||
+      a.product.localeCompare(b.product, "en", { sensitivity: "base" }),
+  );
+
 exports.exportOccupancyConsumptionPDF = exportHandler("Occupancy consumption PDF export", async (req, res) => {
   const report = await buildOccupancyConsumptionReport(req.query);
   const title = "Consumption vs Occupancy";
@@ -365,6 +400,20 @@ exports.exportOccupancyConsumptionPDF = exportHandler("Occupancy consumption PDF
     doc.font("Helvetica-Bold").fontSize(12).fillColor("#1f2926").text("Daily occupancy and service", doc.page.margins.left);
     doc.moveDown(0.3);
     drawTable(doc, { columns: DAY_COLUMNS, rows: report.days, fontSize: 8.5 });
+
+    // Period-over-period trend per product.
+    doc.moveDown(0.5);
+    doc
+      .font("Helvetica-Bold")
+      .fontSize(12)
+      .fillColor("#1f2926")
+      .text(`Period over period (vs ${report.comparison.label})`, doc.page.margins.left);
+    doc.moveDown(0.3);
+    if (report.products.length === 0) {
+      doc.font("Helvetica").fontSize(10).text("No stock out in either period.");
+    } else {
+      drawTable(doc, { columns: TREND_COLUMNS, rows: trendRows(report), fontSize: 8.5 });
+    }
 
     addPageFooters(doc, `${title} · ${report.label}`);
   });
@@ -400,8 +449,8 @@ exports.exportOccupancyConsumptionExcel = exportHandler("Occupancy consumption E
   const metricHeaders = METRICS.flatMap((m) => [`Per ${m.label.replace(/^per /, "")}`, `Days with data (${m.label})`]);
   const header = addStyledHeader(
     sheet,
-    ["Product", "Unit", "Total out", "Movements", ...metricHeaders, "Out on days without occupancy", "Unit conflicts", "Archived", "Notes", "Alert basis", "Normal max", "Period average (alert basis)"],
-    [30, 9, 11, 11, ...METRICS.flatMap(() => [24, 14]), 18, 12, 10, 40, 26, 12, 16],
+    ["Product", "Unit", "Total out", "Movements", ...metricHeaders, "Out on days without occupancy", "Unit conflicts", "Archived", "Notes", "Alert basis", "Normal max", "Period average (alert basis)", "Previous Period Out", "Change (%)"],
+    [30, 9, 11, 11, ...METRICS.flatMap(() => [24, 14]), 18, 12, 10, 40, 26, 12, 16, 18, 12],
   );
   report.products.forEach((r) => {
     sheet.addRow([
@@ -420,6 +469,9 @@ exports.exportOccupancyConsumptionExcel = exportHandler("Occupancy consumption E
       r.alertRule.basis === "none" ? "none (no alerts)" : `${r.alertRule.basis} (${r.alertRule.basisLabel})${r.alertRule.inferred ? " auto" : ""}`,
       r.alertRule.normalMaxThreshold,
       r.alertRule.average,
+      r.previousOut,
+      // Number (e.g. -20) when there is a baseline, "New" when there was none.
+      r.change.pct === null ? r.change.label : r.change.pct,
     ]);
   });
   if (report.products.length === 0) sheet.addRow(["No stock out in this period."]);

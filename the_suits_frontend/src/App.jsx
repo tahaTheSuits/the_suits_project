@@ -15,6 +15,7 @@ import {
 import Reports from "./components/reports.jsx";
 import ProductHistory from "./components/ProductHistory.jsx";
 import LedgerCheck from "./components/LedgerCheck.jsx";
+import { PeriodLockContext, isTodayLocked, lockMessage } from "./periodLock.js";
 import StockOutCard from "./components/StockOutCard.jsx";
 import logo from "./assets/logo2.png";
 import "./App.css";
@@ -84,6 +85,31 @@ function App() {
   // so reports that keep their own data (occupancy, period balance) refetch.
   const [dataVersion, setDataVersion] = useState(0);
 
+  // Accounting period lock (GET/PATCH /api/settings/period-lock).
+  const [periodLockData, setPeriodLockData] = useState({ lockedThroughDate: null, today: null, history: [] });
+  const applyPeriodLock = useCallback((data) => {
+    if (!data) return;
+    setPeriodLockData((prev) => ({
+      lockedThroughDate: data.lockedThroughDate ?? null,
+      today: data.today || prev.today,
+      history: Array.isArray(data.history) ? data.history : prev.history,
+    }));
+  }, []);
+  const reloadPeriodLock = useCallback(async () => {
+    try {
+      const res = await api.get("/api/settings/period-lock");
+      applyPeriodLock(res.data);
+    } catch (err) {
+      // Not fatal: the server still enforces the lock on every change.
+      if (!isCanceled(err)) console.error("period lock:", err);
+    }
+  }, [applyPeriodLock]);
+  const periodLock = useMemo(
+    () => ({ ...periodLockData, reload: reloadPeriodLock, apply: applyPeriodLock }),
+    [periodLockData, reloadPeriodLock, applyPeriodLock],
+  );
+  const todayLocked = isTodayLocked(periodLock);
+
   // Only the latest load may write state; older/aborted responses are ignored.
   const loadSeqRef = useRef(0);
   const abortRef = useRef(null);
@@ -100,6 +126,7 @@ function App() {
     );
 
     const config = { signal: controller.signal };
+    reloadPeriodLock();
     const [inventoryResult, ...reportResults] = await Promise.allSettled([
       api.get("/api/inventory", { ...config, params: { includeArchived: true } }),
       ...REPORT_KEYS.map((key) => api.get(REPORT_ENDPOINTS[key], config)),
@@ -141,7 +168,7 @@ function App() {
       });
       return next;
     });
-  }, [dispatch]);
+  }, [dispatch, reloadPeriodLock]);
 
   useEffect(() => {
     document.title = "The Suites Warehouse";
@@ -292,6 +319,7 @@ function App() {
     });
 
   return (
+    <PeriodLockContext.Provider value={periodLock}>
     <div className="container">
       <header className="app-header">
         <img className="logo" src={logo} alt="The Suites logo" />
@@ -415,12 +443,15 @@ function App() {
               );
             })()}
           </div>
+          {todayLocked && Number(newProductQty) > 0 && (
+            <p className="lock-warning">🔒 {lockMessage(periodLock.lockedThroughDate)} An initial quantity would be a stock in dated today: leave it at 0.</p>
+          )}
           <div className="card-actions">
             <button
               onClick={handleAddNewProduct}
               className="btn btn-primary"
               style={{ width: "140px" }}
-              disabled={Boolean(submitting)}
+              disabled={Boolean(submitting) || (todayLocked && Number(newProductQty) > 0)}
             >
               {submitting === "add" ? "Adding..." : "Add Product"}
             </button>
@@ -456,12 +487,13 @@ function App() {
               {stockInItem ? stockInItem.unit : "unit"}
             </span>
           </div>
+          {todayLocked && <p className="lock-warning">🔒 {lockMessage(periodLock.lockedThroughDate)}</p>}
           <div className="card-actions">
             <button
               onClick={handleStockIn}
               className="btn btn-primary"
               style={{ width: "100px" }}
-              disabled={Boolean(submitting)}
+              disabled={Boolean(submitting) || todayLocked}
             >
               {submitting === "in" ? "Adding..." : "Add"}
             </button>
@@ -626,6 +658,7 @@ function App() {
         />
       )}
     </div>
+    </PeriodLockContext.Provider>
   );
 }
 
