@@ -17,6 +17,9 @@ import ProductHistory from "./components/ProductHistory.jsx";
 import LedgerCheck from "./components/LedgerCheck.jsx";
 import { PeriodLockContext, isTodayLocked, lockMessage } from "./periodLock.js";
 import StockOutCard from "./components/StockOutCard.jsx";
+import PeriodLockControl from "./components/PeriodLockControl.jsx";
+import WarehouseResetControl from "./components/WarehouseResetControl.jsx";
+import { useToast } from "./toast.js";
 import logo from "./assets/logo2.png";
 import "./App.css";
 
@@ -33,6 +36,19 @@ const REPORT_KEYS = Object.keys(REPORT_ENDPOINTS);
 const initialSection = { data: [], loading: true, error: "", loaded: false };
 const initialReports = () =>
   Object.fromEntries(REPORT_KEYS.map((key) => [key, initialSection]));
+
+// Product table filters. "Category" is the consumption basis (housekeeping,
+// laundry, water, fixed, none): the product grouping the warehouse already has.
+const STATUS_FILTERS = [
+  { value: "active", label: "All active" },
+  { value: "ok", label: "In stock" },
+  { value: "low", label: "Low stock" },
+  { value: "out", label: "Out of stock" },
+  { value: "archived", label: "Archived" },
+  { value: "all", label: "All (incl. archived)" },
+];
+
+const PANEL_TITLES = { add: "Add new product", in: "Stock in", out: "Stock out" };
 
 const STATUS_LABELS = {
   out: { label: "Out of Stock", className: "low" },
@@ -59,7 +75,8 @@ const describeConflicts = (conflicts) =>
 function App() {
   const dispatch = useDispatch();
   const items = useSelector((state) => state.inventory.items || []);
-  const [message, setMessage] = useState("");
+  // Feedback goes to the toast stack (top-right), not an inline banner.
+  const notify = useToast();
 
   const [inventoryState, setInventoryState] = useState(initialSection);
   const [reports, setReports] = useState(initialReports);
@@ -79,11 +96,16 @@ function App() {
   const [newProductThreshold, setNewProductThreshold] = useState("");
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [showArchived, setShowArchived] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("active");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  // Which action form is open under the toolbar: "add" | "in" | "out" | null.
+  const [activePanel, setActivePanel] = useState(null);
   const [historyProductId, setHistoryProductId] = useState(null);
   // Bumped after every successful inventory load (i.e. after every save),
   // so reports that keep their own data (occupancy, period balance) refetch.
   const [dataVersion, setDataVersion] = useState(0);
+  // Bumped by a full warehouse reset: report panels remount with empty state.
+  const [resetVersion, setResetVersion] = useState(0);
 
   // Accounting period lock (GET/PATCH /api/settings/period-lock).
   const [periodLockData, setPeriodLockData] = useState({ lockedThroughDate: null, today: null, history: [] });
@@ -189,6 +211,27 @@ function App() {
   );
   const reportRefreshKey = `${dataVersion}#${rulesSignature}`;
 
+  // Full warehouse reset succeeded: clear every view right away, then reload
+  // from the (now empty) server to confirm.
+  const handleWarehouseReset = useCallback(
+    async (result) => {
+      dispatch(setInventory([]));
+      setReports(Object.fromEntries(REPORT_KEYS.map((key) => [key, { data: [], loading: false, error: "", loaded: true }])));
+      setHistoryProductId(null);
+      setStockInProduct("");
+      setStockInQty("");
+      setSearchTerm("");
+      setStatusFilter("active");
+      setCategoryFilter("");
+      setActivePanel(null);
+      applyPeriodLock({ lockedThroughDate: null, history: [] });
+      setResetVersion((v) => v + 1);
+      notify(result?.message || "All warehouse data was deleted.", "success");
+      await loadData();
+    },
+    [dispatch, applyPeriodLock, loadData, notify],
+  );
+
   // A saved product row from the server goes straight into shared state.
   const handleProductUpdated = useCallback((row) => dispatch(upsertInventoryItem(row)), [dispatch]);
   const archivedCount = items.length - activeItems.length;
@@ -212,11 +255,11 @@ function App() {
     try {
       await request();
       await loadData();
-      setMessage(successMessage);
+      notify(successMessage, "success");
       return true;
     } catch (err) {
       console.error(err);
-      setMessage(getErrorMessage(err, fallbackError));
+      notify(getErrorMessage(err, fallbackError), "error");
       return false;
     } finally {
       setSubmitting("");
@@ -225,7 +268,7 @@ function App() {
 
   // Add Product
   const handleAddNewProduct = async () => {
-    if (!newProductName.trim()) return setMessage("Enter product name");
+    if (!newProductName.trim()) return notify("Enter a product name.", "warning");
     const ok = await runMutation(
       "add",
       () =>
@@ -241,7 +284,7 @@ function App() {
           consumptionBasis: newProductBasis || undefined,
           normalMaxThreshold: newProductThreshold === "" ? undefined : Number(newProductThreshold),
         }),
-      "Product added successfully!",
+      `Product "${newProductName.trim()}" added.`,
       "Failed to add product",
     );
     if (ok) {
@@ -258,7 +301,7 @@ function App() {
 
   // Stock In — always recorded in the product's own unit
   const handleStockIn = async () => {
-    if (!stockInItem || !stockInQty) return setMessage("Select product & quantity");
+    if (!stockInItem || !stockInQty) return notify("Select a product and a quantity.", "warning");
     const ok = await runMutation(
       "in",
       () =>
@@ -268,7 +311,7 @@ function App() {
           source: "Main Hotel",
           unit: stockInItem.unit,
         }),
-      "Stock In successful!",
+      `Stock in: ${Number(stockInQty)} ${stockInItem?.unit || ""} of ${stockInItem?.product || "product"}.`,
       "Stock In failed",
     );
     if (ok) {
@@ -278,7 +321,7 @@ function App() {
   };
 
   const handleArchiveProduct = async (item) => {
-    if (!item?._id) return setMessage("No product ID");
+    if (!item?._id) return notify("No product ID.", "error");
     const confirmed = window.confirm(
       `Archive "${item.product}"?\n\n` +
         "It will be hidden from the inventory and the Stock In / Stock Out lists. " +
@@ -303,7 +346,14 @@ function App() {
   };
 
   const visibleItems = items
-    .filter((item) => showArchived || item.isActive !== false)
+    .filter((item) => {
+      const archived = item.isActive === false;
+      if (statusFilter === "all") return true;
+      if (statusFilter === "archived") return archived;
+      if (archived) return false;
+      return statusFilter === "active" || item.status === statusFilter;
+    })
+    .filter((item) => !categoryFilter || item.consumptionBasis === categoryFilter)
     .filter((item) => {
       const term = searchTerm.trim().toLowerCase();
       return (
@@ -320,48 +370,97 @@ function App() {
 
   return (
     <PeriodLockContext.Provider value={periodLock}>
-    <div className="container">
-      <header className="app-header">
-        <img className="logo" src={logo} alt="The Suites logo" />
+    <div className="app-shell">
+      <header className="topbar">
+        <div className="topbar-brand">
+          <img className="topbar-logo" src={logo} alt="The Suites" />
+          <div>
+            <h1 className="topbar-title">Warehouse Management</h1>
+            <p className="topbar-subtitle">Inventory control for housekeeping operations</p>
+          </div>
+        </div>
+        <div className="topbar-actions">
+          <PeriodLockControl />
+          <button type="button" className="btn btn-secondary btn-sm" onClick={() => loadData()} disabled={isLoading}>
+            <span aria-hidden="true">↻</span> {isLoading ? "Refreshing..." : "Refresh"}
+          </button>
+          <WarehouseResetControl onReset={handleWarehouseReset} />
+        </div>
       </header>
 
-      {message && <p className="error-msg">{message}</p>}
+      <main className="container">
+        <section className="stats-grid" aria-label="Key figures">
+          <article className="stat-card stat-total">
+            <p className="stat-label">Total Products</p>
+            <p className="stat-value">{stats.totalProducts}</p>
+          </article>
+          <article className="stat-card stat-low">
+            <p className="stat-label">Low / Out of Stock</p>
+            <p className="stat-value">{stats.lowStockItems}</p>
+          </article>
+          <article className="stat-card stat-in">
+            <p className="stat-label">Stock In Today</p>
+            <p className="stat-value">{stats.stockInToday}</p>
+          </article>
+          <article className="stat-card stat-out">
+            <p className="stat-label">Stock Out Today</p>
+            <p className="stat-value">{stats.stockOutToday}</p>
+          </article>
+        </section>
 
-      <section className="page-hero">
-        <h1 className="title">The Suites Warehouse Dashboard</h1>
-        <p className="subtitle">Inventory control for housekeeping operations</p>
-      </section>
+        <section className="panel products-panel">
+          <div className="toolbar">
+            <div className="toolbar-filters">
+              <input
+                className="input toolbar-search"
+                type="search"
+                placeholder="Search product or barcode..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                aria-label="Search products"
+              />
+              <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} aria-label="Status filter">
+                {STATUS_FILTERS.map((f) => (
+                  <option key={f.value} value={f.value}>
+                    {f.label}
+                    {f.value === "archived" ? ` (${archivedCount})` : ""}
+                  </option>
+                ))}
+              </select>
+              <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} aria-label="Category filter">
+                <option value="">All categories</option>
+                {CONSUMPTION_BASES.map((b) => (
+                  <option key={b.value} value={b.value}>
+                    {b.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="toolbar-actions">
+              {["add", "in", "out"].map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={`btn btn-sm ${key === "add" ? "btn-primary" : "btn-secondary"}${activePanel === key ? " is-active" : ""}`}
+                  onClick={() => setActivePanel(activePanel === key ? null : key)}
+                  aria-expanded={activePanel === key}
+                >
+                  {key === "add" ? "+ Add Product" : key === "in" ? "↓ Stock In" : "↑ Stock Out"}
+                </button>
+              ))}
+            </div>
+          </div>
 
-      <button
-        onClick={() => loadData()}
-        className="btn btn-primary refresh-btn"
-        disabled={isLoading}
-      >
-        {isLoading ? "Refreshing..." : "Refresh Data"}
-      </button>
-
-      <section className="stats-grid">
-        <article className="stat-card stat-total">
-          <p className="stat-label">Total Products</p>
-          <h3 className="stat-value">{stats.totalProducts}</h3>
-        </article>
-        <article className="stat-card stat-low">
-          <p className="stat-label">Low / Out of Stock</p>
-          <h3 className="stat-value">{stats.lowStockItems}</h3>
-        </article>
-        <article className="stat-card stat-in">
-          <p className="stat-label">Stock In Today</p>
-          <h3 className="stat-value">{stats.stockInToday}</h3>
-        </article>
-        <article className="stat-card stat-out">
-          <p className="stat-label">Stock Out Today</p>
-          <h3 className="stat-value">{stats.stockOutToday}</h3>
-        </article>
-      </section>
-
-      <div className="cards-container">
+          {activePanel && (
+            <div className="action-panel" role="region" aria-label={PANEL_TITLES[activePanel]}>
+              <div className="action-panel-head">
+                <h2>{PANEL_TITLES[activePanel]}</h2>
+                <button type="button" className="modal-close" onClick={() => setActivePanel(null)} aria-label="Close form">
+                  ×
+                </button>
+              </div>
+              {activePanel === "add" && (
         <div className="card">
-          <h2>Add New Product</h2>
           <div className="from-row">
             <input
               className="input"
@@ -450,7 +549,7 @@ function App() {
             <button
               onClick={handleAddNewProduct}
               className="btn btn-primary"
-              style={{ width: "140px" }}
+              
               disabled={Boolean(submitting) || (todayLocked && Number(newProductQty) > 0)}
             >
               {submitting === "add" ? "Adding..." : "Add Product"}
@@ -458,9 +557,9 @@ function App() {
           </div>
         </div>
 
-        {/* Stock In */}
+              )}
+              {activePanel === "in" && (
         <div className="card">
-          <h2>Stock In</h2>
           <div className="from-row">
             <select
               value={stockInProduct}
@@ -492,7 +591,7 @@ function App() {
             <button
               onClick={handleStockIn}
               className="btn btn-primary"
-              style={{ width: "100px" }}
+              
               disabled={Boolean(submitting) || todayLocked}
             >
               {submitting === "in" ? "Adding..." : "Add"}
@@ -500,37 +599,18 @@ function App() {
           </div>
         </div>
 
-        {/* Stock Out — barcode scan or manual selection */}
-        <StockOutCard activeItems={activeItems} onRecorded={loadData} setMessage={setMessage} />
+              )}
+              {/* Stock Out — barcode scan or manual selection */}
+              {activePanel === "out" && <StockOutCard activeItems={activeItems} onRecorded={loadData} notify={notify} />}
+            </div>
+          )}
 
-        {/* Search Inventory */}
-        <div className="card search-card">
-          <h2>Search Inventory 🔍</h2>
-          <div className="from-row">
-            <input
-              className="input search-input"
-              placeholder="Search product or barcode..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+          <div className="section-head">
+            <h2 className="section-title">Products</h2>
+            <span className="section-count">
+              {visibleItems.length} shown · {activeItems.length} active{archivedCount ? ` · ${archivedCount} archived` : ""}
+            </span>
           </div>
-          <div className="card-actions card-note">
-            <span>Quickly find items by product name or barcode.</span>
-          </div>
-        </div>
-      </div>
-
-      <div className="inventory-header">
-        <h2 className="inventory-title">Current Inventory</h2>
-        <label className="archived-toggle">
-          <input
-            type="checkbox"
-            checked={showArchived}
-            onChange={(e) => setShowArchived(e.target.checked)}
-          />
-          Show archived ({archivedCount})
-        </label>
-      </div>
 
       {inventoryState.error && (
         <p className="section-error">
@@ -635,7 +715,11 @@ function App() {
           </table>
         )}
       </div>
-      <Reports
+        </section>
+
+        {/* key: a warehouse reset remounts every report panel with empty state */}
+        <Reports
+        key={`reports-${resetVersion}`}
         sections={reports}
         stock={{
           items,
@@ -645,6 +729,7 @@ function App() {
         }}
         products={activeItems}
         refreshKey={reportRefreshKey}
+        resetVersion={resetVersion}
         onRetry={loadData}
         retrying={isLoading}
       />
@@ -657,6 +742,7 @@ function App() {
           onChanged={loadData}
         />
       )}
+      </main>
     </div>
     </PeriodLockContext.Provider>
   );

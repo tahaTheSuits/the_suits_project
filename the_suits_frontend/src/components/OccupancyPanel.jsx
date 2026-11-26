@@ -69,8 +69,10 @@ function MetricCell({ metric, unit }) {
 // update -> full reload) results in a single request.
 const REFRESH_DELAY_MS = 250;
 
-export default function OccupancyPanel({ refreshKey }) {
-  const [open, setOpen] = useState(false);
+// embedded: shown inside a tab (always open, no Open/Hide toggle); the
+// report is loaded the first time the tab becomes `active`.
+export default function OccupancyPanel({ refreshKey, embedded = false, active = true }) {
+  const [open, setOpen] = useState(embedded);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [report, setReport] = useState(null);
@@ -130,6 +132,15 @@ export default function OccupancyPanel({ refreshKey }) {
     setOpen(next);
     if (next && !report) load(fromDate, toDate);
   };
+
+  // Embedded: first load when the tab is opened (no request until then).
+  const autoLoadedRef = useRef(false);
+  useEffect(() => {
+    if (!embedded || !active || autoLoadedRef.current) return undefined;
+    autoLoadedRef.current = true;
+    const timer = setTimeout(() => load(fromDate, toDate), 0);
+    return () => clearTimeout(timer);
+  }, [embedded, active, load, fromDate, toDate]);
 
   const exportAs = async (format) => {
     if (rangeInvalid) return setError("The From date must be on or before the To date.");
@@ -225,9 +236,11 @@ export default function OccupancyPanel({ refreshKey }) {
     <section className="occupancy-panel">
       <div className="current-stock-header">
         <h2 className="reports-section-title">Consumption vs Occupancy</h2>
-        <button className="history-btn" onClick={toggle}>
-          {open ? "Hide" : "Open"}
-        </button>
+        {!embedded && (
+          <button className="history-btn" onClick={toggle}>
+            {open ? "Hide" : "Open"}
+          </button>
+        )}
       </div>
 
       {open && (

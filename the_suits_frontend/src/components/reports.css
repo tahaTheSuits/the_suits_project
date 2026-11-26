@@ -1,9 +1,9 @@
 .reports-container {
   margin-top: 1.75rem;
-  background: #eeefe0;
-  border: 1px solid #d9dfd6;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 16px;
-  box-shadow: 0 12px 28px rgba(31, 41, 38, 0.1);
+  box-shadow: var(--shadow);
   padding: 1rem;
 }
 
@@ -17,9 +17,9 @@
   margin: 0.75rem auto;
   max-width: 560px;
   text-align: center;
-  border: 1px solid #f4cdd2;
-  background: #fde7e9;
-  color: #ac1e2d;
+  border: 1px solid #fecdd3;
+  background: #fff1f2;
+  color: #be123c;
   padding: 0.65rem 0.8rem;
   border-radius: 10px;
 }
@@ -36,11 +36,11 @@
   gap: 0.35rem;
   font-size: 0.88rem;
   font-weight: 600;
-  color: #33433f;
+  color: #334155;
 }
 
 .reports-input {
-  border: 1px solid #d2d9d0;
+  border: 1px solid #cbd5e1;
   border-radius: 10px;
   padding: 0.55rem 0.65rem;
   font-size: 0.9rem;
@@ -48,7 +48,7 @@
 
 .reports-input:focus {
   outline: none;
-  border-color: #819a91;
+  border-color: #2563eb;
   box-shadow: 0 0 0 3px rgba(129, 154, 145, 0.22);
 }
 
@@ -60,8 +60,8 @@
 }
 
 .export-section {
-  background: #f4f5ea;
-  border: 1px solid #d9dfd6;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 0.75rem;
   display: grid;
@@ -71,7 +71,7 @@
 .export-section span {
   font-size: 0.88rem;
   font-weight: 700;
-  color: #33433f;
+  color: #334155;
 }
 
 .current-stock-actions button,
@@ -79,7 +79,7 @@
   border: none;
   border-radius: 8px;
   padding: 0.56rem 0.7rem;
-  background: #5f756d;
+  background: #2563eb;
   color: #fff;
   font-size: 0.82rem;
   font-weight: 600;
@@ -93,7 +93,7 @@
 
 .current-stock-actions button:hover,
 .export-section button:hover {
-  background: #51655e;
+  background: #1e293b;
 }
 
 .reports-section-title {
@@ -103,9 +103,9 @@
 
 .table-wrapper {
   overflow-x: auto;
-  border: 1px solid #d9dfd6;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
-  background: #eeefe0;
+  background: #ffffff;
 }
 
 .reports-table {
@@ -117,24 +117,24 @@
 .reports-table th,
 .reports-table td {
   padding: 0.72rem 0.68rem;
-  border-bottom: 1px solid #e2e7df;
+  border-bottom: 1px solid #e2e8f0;
   text-align: left;
 }
 
 .reports-table th {
-  background: #e8ebdc;
-  color: #33433f;
+  background: #f8fafc;
+  color: #334155;
   font-size: 0.84rem;
   letter-spacing: 0.2px;
 }
 
 .reports-table tbody tr:hover {
-  background: #e7eadb;
+  background: #f1f5f9;
 }
 
 .loading-state {
   text-align: center;
-  color: #5f6b84;
+  color: #64748b;
   padding: 1rem;
 }
 
@@ -161,7 +161,7 @@
   }
 
   .reports-table tr {
-    border-bottom: 1px solid #ebeff6;
+    border-bottom: 1px solid #e2e8f0;
     padding: 0.62rem 0.65rem 0.4rem;
   }
 
@@ -177,7 +177,7 @@
 
   .reports-table td::before {
     content: attr(data-label);
-    color: #5f6b84;
+    color: #64748b;
     font-weight: 600;
     font-size: 0.8rem;
   }
@@ -185,11 +185,11 @@
 .export-period {
   margin: -0.2rem 0 0.8rem;
   font-size: 0.85rem;
-  color: #596460;
+  color: #475569;
 }
 
 .export-period.invalid {
-  color: #ac1e2d;
+  color: #be123c;
   font-weight: 600;
 }
 
@@ -202,8 +202,76 @@
   margin-left: 0.4rem;
   padding: 0.1rem 0.4rem;
   border-radius: 999px;
-  background: #e4e6e1;
-  color: #596460;
+  background: #f1f5f9;
+  color: #475569;
   font-size: 0.7rem;
   font-weight: 600;
+}
+
+
+/* ===== Redesign ===== */
+.reports-section-title {
+  margin: 1.1rem 0 0.6rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.table-wrapper {
+  background: #ffffff;
+  border-color: var(--border);
+  border-radius: 10px;
+}
+
+.reports-table th {
+  background: #f8fafc;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.reports-table td {
+  font-size: 0.9rem;
+}
+
+.reports-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.export-section {
+  background: var(--bg-card);
+  border-color: var(--border);
+}
+
+.current-stock-actions button,
+.export-section button {
+  border-radius: 8px;
+  background: var(--primary);
+  font-family: inherit;
+}
+
+.current-stock-actions button:hover:not(:disabled),
+.export-section button:hover:not(:disabled) {
+  background: var(--primary-hover);
+}
+
+.current-stock-actions .lock-pill {
+  background: var(--warn-bg);
+}
+
+.current-stock-actions .lock-pill.open {
+  background: #ffffff;
+}
+
+.reports-input {
+  border-color: var(--border-dark);
+  border-radius: 8px;
+  min-height: 38px;
+  font-family: inherit;
+}
+
+.reports-input:focus {
+  border-color: var(--primary);
+  box-shadow: var(--focus);
 }

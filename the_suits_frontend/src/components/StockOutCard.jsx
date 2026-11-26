@@ -20,7 +20,7 @@ import { isTodayLocked, lockMessage, usePeriodLock } from "../periodLock.js";
 
 const DUPLICATE_SCAN_MS = 1000;
 
-export default function StockOutCard({ activeItems, onRecorded, setMessage }) {
+export default function StockOutCard({ activeItems, onRecorded, notify }) {
   const [scanCode, setScanCode] = useState("");
   const [productId, setProductId] = useState("");
   const [scannedProduct, setScannedProduct] = useState(null);
@@ -101,8 +101,8 @@ export default function StockOutCard({ activeItems, onRecorded, setMessage }) {
   const submit = async () => {
     if (savingRef.current) return;
     const quantity = Number(qty);
-    if (!item || !qty) return setMessage("Fill all Stock Out fields");
-    if (!Number.isFinite(quantity) || quantity <= 0) return setMessage("Quantity must be a positive number");
+    if (!item || !qty) return notify("Select a product and a quantity.", "warning");
+    if (!Number.isFinite(quantity) || quantity <= 0) return notify("Quantity must be a positive number.", "warning");
 
     savingRef.current = true;
     setSaving(true);
@@ -126,10 +126,11 @@ export default function StockOutCard({ activeItems, onRecorded, setMessage }) {
 
       pendingRequestIdRef.current = null;
       const data = res.data.data;
-      setMessage(
+      notify(
         res.data.duplicate
           ? `Already recorded: ${data.quantity} ${data.unit} of ${item.product} (duplicate ignored).`
-          : `Stock Out: ${data.quantity} ${data.unit} of ${item.product}. Remaining ${data.remainingQuantity} ${data.unit}.`,
+          : `Stock out: ${data.quantity} ${data.unit} of ${item.product}. Remaining ${data.remainingQuantity} ${data.unit}.`,
+        res.data.duplicate ? "warning" : "success",
       );
       const fromScan = cameUsingScanRef.current;
       setProductId("");
@@ -145,7 +146,7 @@ export default function StockOutCard({ activeItems, onRecorded, setMessage }) {
       // cannot record the same stock out twice.
       const status = err?.response?.status;
       if (status && status < 500) pendingRequestIdRef.current = null;
-      setMessage(getErrorMessage(err, "Stock Out failed"));
+      notify(getErrorMessage(err, "Stock Out failed"), "error");
     } finally {
       savingRef.current = false;
       setSaving(false);

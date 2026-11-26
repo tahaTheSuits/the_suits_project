@@ -3,12 +3,12 @@
 // Report data is loaded once by App (shared with the dashboard stats) and
 // passed in per section, so each table loads and fails independently.
 import { useState } from "react";
+import { useToast } from "../toast.js";
 import { downloadFile, getErrorMessage, rangeSlug } from "../api.js";
 import CurrentStockReport from "./CurrentStockReport.jsx";
 import OccupancyPanel from "./OccupancyPanel.jsx";
 import MovementEditModal from "./MovementEditModal.jsx";
 import PeriodBalance from "./PeriodBalance.jsx";
-import PeriodLockControl from "./PeriodLockControl.jsx";
 import { isLockedDate, usePeriodLock } from "../periodLock.js";
 import "./reports.css";
 
@@ -20,6 +20,12 @@ const SECTIONS = [
 ];
 
 const formatDate = (date) => new Date(date).toLocaleDateString("en-GB");
+
+const TABS = [
+  { key: "balance", label: "Stock Balance & Reconciliation" },
+  { key: "occupancy", label: "Occupancy & Consumption Alerts" },
+  { key: "reports", label: "Reports & Exports" },
+];
 
 function ReportTable({ title, type, section, onRetry, retrying, onEdit }) {
   const { data, loading, error, loaded } = section;
@@ -98,12 +104,14 @@ function ReportTable({ title, type, section, onRetry, retrying, onEdit }) {
 }
 
 export default function Reports({ sections, stock, products = [], refreshKey, onRetry, retrying }) {
+  const notify = useToast();
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(null);
-  const [notice, setNotice] = useState("");
+  // Panels stay mounted when another tab is shown (hidden), so loaded data
+  // and form state survive tab switches.
+  const [tab, setTab] = useState("balance");
 
   const startEdit = (type, item) => {
-    setNotice("");
     setEditing({
       _id: item._id,
       movementType: type,
@@ -162,89 +170,98 @@ export default function Reports({ sections, stock, products = [], refreshKey, on
   );
 
   return (
-    <div className="reports-container">
-      <h1 className="reports-title">Reports Dashboard</h1>
-      <div className="reports-lock">
-        <PeriodLockControl />
+    <section className="workspace" aria-label="Reports and analysis">
+      <div className="workspace-head">
+        <div className="tabs" role="tablist" aria-label="Report sections">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              id={`tab-${t.key}`}
+              aria-selected={tab === t.key}
+              aria-controls={`tabpanel-${t.key}`}
+              className={`tab${tab === t.key ? " active" : ""}`}
+              onClick={() => setTab(t.key)}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        {tab !== "occupancy" && (
+          <div className="period-bar">
+            <label>
+              From
+              <input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="reports-input" />
+            </label>
+            <label>
+              To
+              <input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="reports-input" />
+            </label>
+            <span className={`export-period${rangeInvalid ? " invalid" : ""}`}>
+              {rangeInvalid ? "The From date must be on or before the To date." : `Period: ${periodLabel}`}
+            </span>
+          </div>
+        )}
       </div>
-      <CurrentStockReport {...stock} onRetry={onRetry} />
-      <OccupancyPanel refreshKey={refreshKey} />
 
       {error && <p className="reports-error">{error}</p>}
-      {notice && <p className="modal-notice">{notice}</p>}
 
-      {/* Date Filters */}
-      <div className="reports-filters">
-        <label>
-          From
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="reports-input"
-          />
-        </label>
-        <label>
-          To
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            className="reports-input"
-          />
-        </label>
-      </div>
-      <p className={`export-period${rangeInvalid ? " invalid" : ""}`}>
-        {rangeInvalid
-          ? "The From date must be on or before the To date."
-          : `Exports cover ${periodLabel}. Leave both dates empty to export everything.`}
-      </p>
-
-      {/* Export Buttons */}
-      <div className="export-container">
-        <div className="export-section">
-          <span>Stock In</span>
-          {exportButton("stock-in", "pdf")}
-          {exportButton("stock-in", "excel")}
-        </div>
-        <div className="export-section">
-          <span>Stock Out</span>
-          {exportButton("stock-out", "pdf")}
-          {exportButton("stock-out", "excel")}
-        </div>
-      </div>
-
-      <PeriodBalance
-        refreshKey={refreshKey}
-        fromDate={fromDate}
-        toDate={toDate}
-        rangeInvalid={rangeInvalid}
-        periodLabel={periodLabel}
-        onChanged={onRetry}
-      />
-
-      {SECTIONS.map(({ key, title, type }) => (
-        <ReportTable
-          key={key}
-          title={title}
-          type={type}
-          section={sections[key]}
-          onRetry={onRetry}
-          retrying={retrying}
-          onEdit={startEdit}
+      <div className="tab-panel" role="tabpanel" id="tabpanel-balance" aria-labelledby="tab-balance" hidden={tab !== "balance"}>
+        <CurrentStockReport {...stock} onRetry={onRetry} />
+        <PeriodBalance
+          refreshKey={refreshKey}
+          fromDate={fromDate}
+          toDate={toDate}
+          rangeInvalid={rangeInvalid}
+          periodLabel={periodLabel}
+          onChanged={onRetry}
         />
-      ))}
+      </div>
+
+      <div className="tab-panel" role="tabpanel" id="tabpanel-occupancy" aria-labelledby="tab-occupancy" hidden={tab !== "occupancy"}>
+        <OccupancyPanel refreshKey={refreshKey} embedded active={tab === "occupancy"} />
+      </div>
+
+      <div className="tab-panel" role="tabpanel" id="tabpanel-reports" aria-labelledby="tab-reports" hidden={tab !== "reports"}>
+        <div className="export-container">
+          <div className="export-section">
+            <span>Stock In</span>
+            {exportButton("stock-in", "pdf")}
+            {exportButton("stock-in", "excel")}
+          </div>
+          <div className="export-section">
+            <span>Stock Out</span>
+            {exportButton("stock-out", "pdf")}
+            {exportButton("stock-out", "excel")}
+          </div>
+        </div>
+        <p className="field-hint">Exports cover {periodLabel}. Leave both dates empty to export everything.</p>
+
+        {SECTIONS.map(({ key, title, type }) => (
+          <ReportTable
+            key={key}
+            title={title}
+            type={type}
+            section={sections[key]}
+            onRetry={onRetry}
+            retrying={retrying}
+            onEdit={startEdit}
+          />
+        ))}
+      </div>
+
       {editing && (
         <MovementEditModal
           movement={editing}
           products={products}
           onClose={() => setEditing(null)}
           onSaved={async (result) => {
-            setNotice(`${result?.message || "Entry updated."} Stock and reports were refreshed.`);
+            notify(`${result?.message || "Entry updated."} Stock and reports were refreshed.`, "success");
             await onRetry();
           }}
         />
       )}
-    </div>
+    </section>
   );
 }
