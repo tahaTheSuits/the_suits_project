@@ -23,6 +23,7 @@ const Occupancy = require("../models/occupancyModel");
 const { DEFAULT_UNIT, normalizeUnit } = require("./units");
 const { latestCorrectionLookup, EFFECTIVE_QUANTITY, IS_CORRECTED, productUnitOf } = require("./stock");
 const { businessTimeZone, paddedUtcWindow, resolveDayRange } = require("./businessDay");
+const { normalizeMeta } = require("./occupancyMeta");
 
 const OCCUPANCY_FIELDS = [
   "totalApartments",
@@ -188,6 +189,9 @@ async function buildOccupancyConsumptionReport(query = {}) {
     return {
       date: day,
       ...fields,
+      // isSunday, isHoliday, holidayName, noScheduledCleaning, noServiceReason,
+      // pausedServiceApartments, breakdown (defaults for older records).
+      ...normalizeMeta(record),
       hasRecord: Boolean(record),
       hasOccupancy: known(fields.occupiedApartments),
       hasService: known(fields.servicedApartments) || known(fields.housekeepingCount),
@@ -221,6 +225,9 @@ async function buildOccupancyConsumptionReport(query = {}) {
     checkOuts: sumKnown(recordsInRange, "checkOuts"),
     averageOccupancyRate: totalForRate > 0 ? round(occupiedForRate / totalForRate, 4) : null,
     productsWithStockOut: productRows.length,
+    daysSunday: days.filter((d) => d.isSunday).length,
+    daysHoliday: days.filter((d) => d.isHoliday).length,
+    daysNoScheduledCleaning: days.filter((d) => d.noScheduledCleaning).length,
   };
 
   return {

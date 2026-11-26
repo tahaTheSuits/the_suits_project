@@ -3,6 +3,8 @@
 // out per product. Collapsed by default so it adds no requests on page load.
 import { useCallback, useState } from "react";
 import { api, downloadFile, getErrorMessage, rangeSlug } from "../api.js";
+import { dayBadge } from "../dayStatus.js";
+import DayDetailsModal, { DashboardLink } from "./DayDetailsModal.jsx";
 
 const FIELDS = [
   { key: "totalApartments", label: "Total apartments" },
@@ -59,6 +61,8 @@ export default function OccupancyPanel() {
   const [syncing, setSyncing] = useState(false);
   const [forceSync, setForceSync] = useState(false);
   const [syncResult, setSyncResult] = useState(null); // { ok, message, details? }
+  const [detailsDay, setDetailsDay] = useState(null);
+  const closeDetails = useCallback(() => setDetailsDay(null), []);
 
   const rangeInvalid = Boolean(fromDate && toDate && fromDate > toDate);
   const params = { from: fromDate || undefined, to: toDate || undefined };
@@ -136,6 +140,7 @@ export default function OccupancyPanel() {
   };
 
   const editDay = (day) => {
+    setDetailsDay(null);
     setNotice("");
     setForm({
       date: day.date,
@@ -371,9 +376,20 @@ export default function OccupancyPanel() {
                     </tr>
                   </thead>
                   <tbody>
-                    {report.days.map((d) => (
+                    {report.days.map((d) => {
+                      const badge = dayBadge(d);
+                      return (
                       <tr key={d.date} className={d.hasRecord ? undefined : "missing-row"}>
-                        <td data-label="Date">{gb(d.date)}</td>
+                        <td data-label="Date">
+                          <span className="day-date">
+                            {gb(d.date)}
+                            {badge && (
+                              <span className={`day-badge ${badge.kind}`} title={d.noServiceReason || badge.text}>
+                                {badge.text}
+                              </span>
+                            )}
+                          </span>
+                        </td>
                         <td data-label="Occupied / total">
                           {d.hasRecord ? `${dash(d.occupiedApartments)} / ${dash(d.totalApartments)}` : "No data"}
                         </td>
@@ -391,13 +407,18 @@ export default function OccupancyPanel() {
                         <td data-label="Stock out">
                           {d.stockOutByUnit.length ? d.stockOutByUnit.map((t) => `${t.quantity} ${t.unit}`).join(" · ") : "–"}
                         </td>
-                        <td data-label="">
+                        <td data-label="" className="day-actions">
+                          <button className="link-btn" onClick={() => setDetailsDay(d)}>
+                            Details
+                          </button>
                           <button className="link-btn" onClick={() => editDay(d)}>
                             {d.hasRecord ? "Edit" : "Add"}
                           </button>
+                          <DashboardLink date={d.date} compact />
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -405,6 +426,7 @@ export default function OccupancyPanel() {
           )}
         </>
       )}
+      {detailsDay && <DayDetailsModal key={detailsDay.date} day={detailsDay} onClose={closeDetails} onEdit={editDay} />}
     </section>
   );
 }

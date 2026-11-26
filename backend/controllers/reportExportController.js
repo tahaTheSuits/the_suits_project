@@ -27,6 +27,7 @@ const {
   exportHandler,
 } = require("../utils/exportHelpers");
 const { buildOccupancyConsumptionReport, metricText, METRICS } = require("../utils/occupancyReport");
+const { dayTypeText, BREAKDOWN_KEYS } = require("../utils/occupancyMeta");
 const { gbDay } = require("../utils/businessDay");
 
 const HEADER_FILL = "FF5F756D";
@@ -271,6 +272,9 @@ const occupancyLines = (report) => {
     `Period: ${report.label} · business days in ${report.timeZone}`,
     `Occupancy data for ${s.daysWithOccupancy} of ${s.totalDays} days · service data for ${s.daysWithServicedApartments} · housekeeping data for ${s.daysWithHousekeeping}`,
     `Occupied apartment-nights: ${dash(s.occupiedApartmentNights)} · serviced apartments: ${dash(s.servicedApartments)} · housekeeping tasks: ${dash(s.housekeepingTasks)} · average occupancy: ${pct(s.averageOccupancyRate)}`,
+    ...(s.daysNoScheduledCleaning || s.daysHoliday || s.daysSunday
+      ? [`Sundays: ${s.daysSunday || 0} · holidays: ${s.daysHoliday || 0} · days without scheduled cleaning: ${s.daysNoScheduledCleaning || 0}`]
+      : []),
     "Averages use only days that have the relevant data; quantities are in each product's own unit (corrections applied)",
     `Generated ${formatDateTime(report.generatedAt)}`,
   ];
@@ -290,6 +294,7 @@ const CONSUMPTION_COLUMNS = [
 
 const DAY_COLUMNS = [
   { header: "Date", width: 1.2, value: (d) => gbDay(d.date) },
+  { header: "Day", width: 1.6, muted: true, value: (d) => dayTypeText(d) || "–" },
   {
     header: "Occupied / total",
     width: 1.4,
@@ -305,8 +310,8 @@ const DAY_COLUMNS = [
   { header: "Housekeeping", width: 1.1, align: "right", value: (d) => dash(d.housekeepingCount) },
   { header: "Laundry", width: 0.8, align: "right", value: (d) => dash(d.laundryCount) },
   { header: "Water", width: 0.8, align: "right", value: (d) => dash(d.waterCount) },
-  { header: "Source", width: 1.2, value: sourceText },
-  { header: "Stock out", width: 2.2, value: (d) => unitTotals(d.stockOutByUnit) },
+  { header: "Source", width: 1.1, value: sourceText },
+  { header: "Stock out", width: 1.9, value: (d) => unitTotals(d.stockOutByUnit) },
 ];
 
 exports.exportOccupancyConsumptionPDF = exportHandler("Occupancy consumption PDF export", async (req, res) => {
@@ -390,8 +395,12 @@ exports.exportOccupancyConsumptionExcel = exportHandler("Occupancy consumption E
   const days = workbook.addWorksheet("Daily occupancy");
   const dayHeader = addStyledHeader(
     days,
-    ["Date", "Total apartments", "Occupied", "Vacant", "Check-ins", "Check-outs", "Serviced", "Housekeeping", "Laundry", "Water", "Source", "Note", "Stock out (by unit)"],
-    [12, 16, 10, 9, 10, 11, 10, 13, 9, 8, 16, 30, 30],
+    [
+      "Date", "Total apartments", "Occupied", "Vacant", "Check-ins", "Check-outs", "Serviced", "Housekeeping", "Laundry", "Water", "Source", "Note", "Stock out (by unit)",
+      "Sunday", "Holiday", "Holiday name", "No scheduled cleaning", "No-service reason", "Paused service apartments",
+      "Occupied apts", "Check-in apts", "Check-out apts", "Serviced apts", "Housekeeping apts", "Laundry apts", "Water apts", "Paused apts",
+    ],
+    [12, 16, 10, 9, 10, 11, 10, 13, 9, 8, 16, 30, 30, 9, 9, 22, 12, 30, 12, 28, 22, 22, 28, 22, 22, 22, 22],
   );
   report.days.forEach((d) => {
     const [y, m, dd] = d.date.split("-").map(Number);
@@ -409,6 +418,13 @@ exports.exportOccupancyConsumptionExcel = exportHandler("Occupancy consumption E
       sourceText(d),
       d.note,
       unitTotals(d.stockOutByUnit),
+      d.isSunday ? "Yes" : "No",
+      d.isHoliday ? "Yes" : "No",
+      d.holidayName || "",
+      d.noScheduledCleaning ? "Yes" : "No",
+      d.noServiceReason || "",
+      d.pausedServiceApartments,
+      ...BREAKDOWN_KEYS.map((k) => d.breakdown[k].join(", ")),
     ]);
     row.getCell(1).numFmt = "dd/mm/yyyy";
   });

@@ -34,7 +34,27 @@ export const cameraScanSupported = () =>
   "BarcodeDetector" in window &&
   Boolean(navigator.mediaDevices?.getUserMedia);
 
-export const sleep =(ms) => new Promise((resolve) => setTimeout(resolve, ms));
+export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// the-suites-admin-dashboard frontend, e.g. "https://dashboard.example.com"
+// (-> /?date=YYYY-MM-DD) or ".../dashboard" (-> /dashboard?date=YYYY-MM-DD).
+// No URL is guessed: when VITE_DASHBOARD_URL is not set, the links are
+// shown disabled with a hint instead of pointing somewhere wrong.
+const DASHBOARD_URL = (import.meta.env.VITE_DASHBOARD_URL || "").trim();
+
+export const dashboardDayUrl = (date) => {
+  if (!DASHBOARD_URL || !date) return null;
+  try {
+    const url = new URL(DASHBOARD_URL);
+    if (!["http:", "https:"].includes(url.protocol)) return null;
+    url.searchParams.set("date", date);
+    return url.toString();
+  } catch {
+    return null;
+  }
+};
+
+export const DASHBOARD_NOT_CONFIGURED = "Set VITE_DASHBOARD_URL to link to the admin dashboard";
 
 // Local calendar date for filenames, e.g. "2026-11-25".
 export const todayStamp = () => {

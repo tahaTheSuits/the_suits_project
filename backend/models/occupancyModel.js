@@ -8,6 +8,24 @@ const mongoose = require("mongoose");
 // source "manual":         entered/edited in the warehouse UI
 // manualOverride: true -> syncs leave this day alone unless force=true.
 const count = { type: Number, min: 0, default: null };
+const apartmentList = { type: [String], default: [] };
+
+// Apartment numbers behind the daily counts (from the dashboard). Older
+// records have no breakdown; reads fall back to empty lists
+// (utils/occupancyMeta.js normalizeMeta).
+const breakdownSchema = new mongoose.Schema(
+  {
+    occupiedApartmentNumbers: apartmentList,
+    checkInApartmentNumbers: apartmentList,
+    checkOutApartmentNumbers: apartmentList,
+    servicedApartmentNumbers: apartmentList,
+    housekeepingApartmentNumbers: apartmentList,
+    laundryApartmentNumbers: apartmentList,
+    waterApartmentNumbers: apartmentList,
+    pausedServiceApartments: apartmentList,
+  },
+  { _id: false }
+);
 
 const occupancySchema = new mongoose.Schema(
   {
@@ -29,6 +47,15 @@ const occupancySchema = new mongoose.Schema(
     housekeepingCount: count,
     laundryCount: count,
     waterCount: count,
+
+    // Day metadata (dashboard sync). Defaults keep older records valid.
+    isSunday: { type: Boolean, default: false },
+    isHoliday: { type: Boolean, default: false },
+    holidayName: { type: String, trim: true, maxlength: 120, default: null },
+    noScheduledCleaning: { type: Boolean, default: false },
+    noServiceReason: { type: String, trim: true, maxlength: 300, default: null },
+    pausedServiceApartments: { type: Number, min: 0, default: 0 },
+    breakdown: { type: breakdownSchema, default: () => ({}) },
 
     note: { type: String, trim: true, maxlength: 500, default: "" },
 

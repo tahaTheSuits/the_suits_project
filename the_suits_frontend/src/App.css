@@ -797,3 +797,180 @@ select:focus {
   padding-left: 1.2rem;
   font-size: 0.82rem;
 }
+
+/* ===== Day status, details modal, dashboard links ===== */
+.day-date {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.day-badge {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.08rem 0.45rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+
+.day-date .day-badge {
+  margin-left: 0;
+}
+
+.day-badge.holiday {
+  background: #fbefd9;
+  color: #7a4f06;
+  border-color: #f0dcb4;
+}
+
+.day-badge.sunday {
+  background: #e7ecf3;
+  color: #3c5272;
+  border-color: #d3dceb;
+}
+
+.day-badge.paused {
+  background: #efe9f5;
+  color: #5b4378;
+  border-color: #ddd2ea;
+}
+
+.day-actions {
+  white-space: nowrap;
+}
+
+.day-actions .link-btn + .link-btn,
+.day-actions .dashboard-link.compact {
+  margin-left: 0.5rem;
+}
+
+.dashboard-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.dashboard-link.compact {
+  padding: 0.1rem 0.4rem;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  color: var(--primary);
+  font-weight: 700;
+  font-size: 0.85rem;
+  line-height: 1.3;
+}
+
+.dashboard-link.compact:hover {
+  background: var(--bg-subtle);
+}
+
+.dashboard-link.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.day-details .modal-header {
+  align-items: flex-start;
+}
+
+.day-details-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.day-details-header-actions .btn {
+  padding: 0.45rem 0.8rem;
+  font-size: 0.85rem;
+}
+
+.day-status-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-top: 0.9rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+}
+
+.day-status-banner.paused {
+  background: #fbefd9;
+  color: #6b4506;
+  border: 1px solid #f0dcb4;
+}
+
+.day-status-banner.info {
+  background: #e7ecf3;
+  color: #3c5272;
+  border: 1px solid #d3dceb;
+}
+
+.day-facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 0.55rem;
+}
+
+.day-fact {
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+}
+
+.day-fact dt {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.day-fact dd {
+  margin: 0.15rem 0 0;
+}
+
+.day-fact-value {
+  font-size: 1.05rem;
+  font-weight: 650;
+}
+
+.apt-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.35rem;
+}
+
+.apt-chip {
+  padding: 0.05rem 0.4rem;
+  border-radius: 6px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-dark);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.empty-state {
+  margin: 0;
+  padding: 0.9rem;
+  text-align: center;
+  color: var(--text-muted);
+  border: 1px dashed var(--border-dark);
+  border-radius: 10px;
+}
+
+.day-details-footer {
+  margin-top: 1.2rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}

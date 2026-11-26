@@ -2,6 +2,8 @@
 //
 //   GET  /api/occupancy?from=&to=     list days (default: last 31 days)
 //   GET  /api/occupancy/:date         one day
+//   GET  /api/occupancy/:date/details one day + the warehouse stock outs
+//                                     recorded on that business day
 //   PUT  /api/occupancy/:date         manual entry / edit (upsert, merge)
 //   POST /api/occupancy/sync          idempotent bulk upsert from the
 //                                     admin dashboard (optional token)
@@ -9,8 +11,11 @@
 // Nothing here deletes records. Unknown counts are stored as null, never 0.
 const crypto = require("crypto");
 const Occupancy = require("../models/occupancyModel");
-const { ExportError } = require("../utils/exportHelpers");
-const { parseDayKey, resolveDayRange, businessTimeZone } = require("../utils/businessDay");
+const StockOut = require("../models/stockOutModel");
+const { ExportError, totalsByUnit } = require("../utils/exportHelpers");
+const { parseDayKey, resolveDayRange, businessTimeZone, paddedUtcWindow } = require("../utils/businessDay");
+const { buildMovementPipeline, normalizeRows } = require("../utils/reportPipeline");
+const { OccupancyError, readMeta, mergeMeta, sameMeta, normalizeMeta } = require("../utils/occupancyMeta");
 
 const COUNT_FIELDS = [
   "totalApartments",
@@ -25,13 +30,6 @@ const COUNT_FIELDS = [
 ];
 const MAX_COUNT = 100000;
 const MAX_SYNC_RECORDS = 366;
-
-class OccupancyError extends Error {
-  constructor(message) {
-    super(message);
-    this.status = 400;
-  }
-}
 
 // Reads the count fields present in `input` (partial update semantics).
 // Present + null/"" -> clear (unknown). Omitted -> leave unchanged.
@@ -99,7 +97,8 @@ const sameCounts = (a, b) => COUNT_FIELDS.every((f) => (a?.[f] ?? null) === (b?.
 const toJson = (doc) => {
   if (!doc) return null;
   const { __v, ...rest } = doc.toObject ? doc.toObject() : doc;
-  return rest;
+  // Older records lack the day metadata: fill in the defaults.
+  return { ...rest, ...normalizeMeta(rest) };
 };
 
 const isDuplicateKeyError = (err) => err && err.code === 11000;
@@ -138,6 +137,55 @@ exports.getOccupancyDay = async (req, res) => {
   }
 };
 
+// GET /api/occupancy/:date/details
+// -> { date, timeZone, record (null if the day has no occupancy record),
+//      meta (day metadata, defaults when unknown), stockOuts[], stockOutTotals[] }
+// stockOuts are the warehouse stock-out movements whose date falls on that
+// business day, with corrected (effective) quantities, oldest first.
+exports.getOccupancyDayDetails = async (req, res) => {
+  try {
+    const date = parseDayKey(req.params.date);
+    if (!date) throw new OccupancyError(`Invalid date "${req.params.date}". Use YYYY-MM-DD.`);
+    const timeZone = businessTimeZone();
+    const window = paddedUtcWindow(date, date);
+    const [movementMatch, ...rest] = buildMovementPipeline("out", window, { date: 1 });
+
+    const [record, rows] = await Promise.all([
+      Occupancy.findOne({ date }).lean(),
+      StockOut.aggregate([
+        movementMatch,
+        { $match: { $expr: { $eq: [{ $dateToString: { format: "%Y-%m-%d", date: "$date", timezone: timeZone } }, date] } } },
+        ...rest,
+      ]),
+    ]);
+
+    const stockOuts = normalizeRows(rows).map((row) => ({
+      id: String(row._id),
+      product: row.productName || "Unknown product",
+      productArchived: Boolean(row.productArchived),
+      quantity: row.quantity,
+      unit: row.unit,
+      date: row.date,
+      note: row.note || "",
+      corrected: Boolean(row.corrected),
+      originalQuantity: row.originalQuantity,
+      originalUnit: row.originalUnit,
+      correctionReason: row.correctionReason || null,
+    }));
+
+    res.json({
+      date,
+      timeZone,
+      record: toJson(record),
+      meta: normalizeMeta(record),
+      stockOuts,
+      stockOutTotals: totalsByUnit(stockOuts),
+    });
+  } catch (err) {
+    handleError(res, err, "Failed to load the day details");
+  }
+};
+
 // ---------------- manual entry ----------------
 
 // PUT /api/occupancy/:date
@@ -151,16 +199,22 @@ exports.putOccupancyDay = async (req, res) => {
     const body = req.body || {};
 
     const update = readCounts(body);
+    const metaUpdate = readMeta(body);
     const note = readNote(body);
     const existing = await Occupancy.findOne({ date }).lean();
     const merged = mergeCounts(existing, update);
+    const meta = mergeMeta(existing, metaUpdate);
 
     const manualOverride =
       Object.prototype.hasOwnProperty.call(body, "manualOverride") ? Boolean(body.manualOverride) : true;
-    const countsChanged = !existing || !sameCounts(existing, merged) || (note !== undefined && note !== existing.note);
+    const countsChanged =
+      !existing ||
+      !sameCounts(existing, merged) ||
+      !sameMeta(existing, meta) ||
+      (note !== undefined && note !== existing.note);
 
     // Saving only the override flag keeps the record's source as it is.
-    const set = { ...merged, manualOverride };
+    const set = { ...merged, ...meta, manualOverride };
     if (note !== undefined) set.note = note;
     if (countsChanged) {
       set.source = "manual";
@@ -221,6 +275,7 @@ async function syncOne(input, { force, now }) {
   }
 
   const update = readCounts(input);
+  const metaUpdate = readMeta(input);
   const note = readNote(input);
   const existing = await Occupancy.findOne({ date }).lean();
 
@@ -232,9 +287,11 @@ async function syncOne(input, { force, now }) {
   }
 
   const merged = mergeCounts(existing, update);
+  const meta = mergeMeta(existing, metaUpdate);
   const changed =
     !existing ||
     !sameCounts(existing, merged) ||
+    !sameMeta(existing, meta) ||
     (note !== undefined && note !== existing.note) ||
     existing.source !== "dashboard_sync" ||
     existing.manualOverride;
@@ -242,7 +299,7 @@ async function syncOne(input, { force, now }) {
   const set = { syncedAt: now };
   if (sourceUpdatedAt) set.sourceUpdatedAt = sourceUpdatedAt;
   if (changed) {
-    Object.assign(set, merged, { source: "dashboard_sync", manualOverride: false });
+    Object.assign(set, merged, meta, { source: "dashboard_sync", manualOverride: false });
     if (note !== undefined) set.note = note;
   }
 

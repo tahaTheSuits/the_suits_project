@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   listOccupancy,
   getOccupancyDay,
+  getOccupancyDayDetails,
   putOccupancyDay,
   syncOccupancy,
   requireSyncToken,
@@ -15,6 +16,7 @@ router.get("/", listOccupancy);
 router.post("/sync", requireSyncToken, syncOccupancy);
 // Pull: the warehouse fetches records from the dashboard (UI button).
 router.post("/pull-dashboard", pullFromDashboard);
+router.get("/:date/details", getOccupancyDayDetails);
 router.get("/:date", getOccupancyDay);
 router.put("/:date", putOccupancyDay);
 

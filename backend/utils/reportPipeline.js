@@ -10,6 +10,7 @@ const { latestCorrectionLookup, EFFECTIVE_QUANTITY, IS_CORRECTED } = require("./
 // Only fields that exist in the schemas. (Floor / Used By were never stored,
 // so they are no longer projected or exported as empty columns.)
 const IN_FIELDS = { source: 1 };
+const OUT_FIELDS = { note: 1 };
 
 const buildMovementPipeline = (movementType, { start, end }, sort) => [
   { $match: { date: { $gte: start, $lte: end } } },
@@ -35,7 +36,7 @@ const buildMovementPipeline = (movementType, { start, end }, sort) => [
       corrected: IS_CORRECTED,
       correctionReason: { $arrayElemAt: ["$latestCorrection.reason", 0] },
       date: 1,
-      ...(movementType === "in" ? IN_FIELDS : {}),
+      ...(movementType === "in" ? IN_FIELDS : OUT_FIELDS),
     },
   },
   // Case-insensitive product sort ("apple" next to "Apple", not after "Z").

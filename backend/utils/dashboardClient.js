@@ -1,7 +1,9 @@
 // Client for the-suites-admin-dashboard's warehouse integration endpoint:
 //
 //   GET {DASHBOARD_API_URL}/api/integrations/warehouse/daily?from=YYYY-MM-DD&to=YYYY-MM-DD
-//   -> { days: [ { date, totalApartments, occupiedApartments, ... , updatedAt } ] }
+//   -> { days: [ { date, totalApartments, occupiedApartments, ..., isSunday,
+//                  isHoliday, holidayName, noScheduledCleaning, noServiceReason,
+//                  pausedServiceApartments, breakdown: { ... }, updatedAt } ] }
 //
 // Environment:
 //   DASHBOARD_API_URL     base URL of the dashboard API (trailing slashes ok)
@@ -15,6 +17,7 @@
 const DEFAULT_TIMEOUT_MS = 15000;
 const DAILY_PATH = "/api/integrations/warehouse/daily";
 const KEY_VARS = ["DASHBOARD_API_KEY", "WAREHOUSE_API_KEY", "OCCUPANCY_SYNC_TOKEN"];
+const { META_FIELDS } = require("./occupancyMeta");
 
 // Fields copied from the dashboard into the Occupancy sync pipeline.
 const MAPPED_FIELDS = [
@@ -27,6 +30,8 @@ const MAPPED_FIELDS = [
   "housekeepingCount",
   "laundryCount",
   "waterCount",
+  // Day metadata + apartment-number breakdown (utils/occupancyMeta.js).
+  ...META_FIELDS,
 ];
 
 class DashboardError extends Error {

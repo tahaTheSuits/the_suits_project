@@ -76,6 +76,44 @@ Rules:
 * At most **366 records** per request, each date at most once.
 * Integers only (no decimals), 0–100000.
 
+### Day metadata and apartment breakdown (optional)
+
+Each record (push or pull) may also carry:
+
+```json
+{
+  "isSunday": false,
+  "isHoliday": true,
+  "holidayName": "Independence Day",
+  "noScheduledCleaning": true,
+  "noServiceReason": "Public holiday",
+  "pausedServiceApartments": 12,
+  "breakdown": {
+    "occupiedApartmentNumbers": ["101", "102"],
+    "checkInApartmentNumbers": ["102"],
+    "checkOutApartmentNumbers": [],
+    "servicedApartmentNumbers": [],
+    "housekeepingApartmentNumbers": [],
+    "laundryApartmentNumbers": [],
+    "waterApartmentNumbers": [],
+    "pausedServiceApartments": ["101", "102"]
+  }
+}
+```
+
+| Field | Type | Default | Meaning |
+|---|---|---|---|
+| `isSunday`, `isHoliday`, `noScheduledCleaning` | boolean | `false` | Day flags (`null` → `false`) |
+| `holidayName` | string ≤ 120 or `null` | `null` | Shown as "Holiday: …" |
+| `noServiceReason` | string ≤ 300 or `null` | `null` | Why scheduled cleaning was paused |
+| `pausedServiceApartments` | integer ≥ 0 | `0` | Apartments whose service was paused |
+| `breakdown.<list>` | array of apartment numbers (strings or numbers, ≤ 32 chars, max 5000) | `[]` | Stored as trimmed strings, duplicates removed, order kept |
+
+Same partial-update rules: omitted fields stay unchanged, `null` resets to the
+default. Inside `breakdown`, each list sent replaces the stored list and lists
+not sent stay unchanged; `"breakdown": null` clears all lists. Records stored
+before these fields existed are returned with the defaults.
+
 ## Response (`200`)
 
 ```json
@@ -121,6 +159,9 @@ By default that marks the day `manualOverride: true`, and syncs then skip it
 
 * `GET /api/occupancy?from=YYYY-MM-DD&to=YYYY-MM-DD` — stored days
 * `GET /api/occupancy/YYYY-MM-DD` — one day (`404` if none)
+* `GET /api/occupancy/YYYY-MM-DD/details` — `{ date, timeZone, record | null,
+  meta, stockOuts[], stockOutTotals[] }`: the day's record plus the warehouse
+  stock-out movements recorded on that business day (corrected quantities)
 * `GET /api/reports/occupancy-consumption?from=…&to=…` — the combined report
 
 
@@ -155,13 +196,20 @@ Response `200`:
       "housekeepingCount": 92,
       "laundryCount": 40,
       "waterCount": 60,
+      "isSunday": false,
+      "isHoliday": false,
+      "holidayName": null,
+      "noScheduledCleaning": false,
+      "noServiceReason": null,
+      "pausedServiceApartments": 0,
+      "breakdown": { "occupiedApartmentNumbers": ["101", "102"] },
       "updatedAt": "2026-11-24T21:05:00Z"
     }
   ]
 }
 ```
 
-* Same field meanings and rules as the push contract above (integers ≥ 0 or
+* Same field meanings (including the day metadata and `breakdown`) and rules as the push contract above (integers ≥ 0 or
   `null`, `date` = hotel calendar day, omitted fields stay unchanged).
 * Other properties on a day are ignored. Days outside `from..to`, duplicate
   dates and invalid dates are reported as `invalid` and skipped; the other
