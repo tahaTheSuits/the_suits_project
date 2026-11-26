@@ -21,14 +21,20 @@ function AnomalyFigures({ r }) {
   const parts = [];
   if (r.type === "non_service_day") parts.push(`${r.quantity} ${r.unit} on a ${r.dayType}`);
   else if (r.type === "zero_service") parts.push(`${r.quantity} ${r.unit} with 0 ${r.countLabel}`);
-  else if (r.basis === "fixed") parts.push(`${r.quantity} ${r.unit} today`);
-  else parts.push(`${r.rate} ${r.unit} (${r.quantity} ÷ ${r.count} ${r.countLabel})`);
-  if (r.threshold !== null && r.threshold !== undefined) parts.push(`normal max ${r.threshold}`);
-  else if (r.average !== null && r.average !== undefined) parts.push(`period average ${r.average}`);
-  if (r.ratio) parts.push(`${r.ratio}×`);
+  else if (r.comparison) {
+    // e.g. "1.10 vs max 0.90 per housekeeping room" + how the rate was made
+    parts.push(r.comparison);
+    if (r.basis !== "fixed") parts.push(`${r.quantity} ${r.unit} ÷ ${r.count} ${r.countLabel}`);
+  } else {
+    parts.push(r.basis === "fixed" ? `${r.quantity} ${r.unit} today` : `${r.rate} ${r.unit} (${r.quantity} ÷ ${r.count} ${r.countLabel})`);
+    if (r.threshold !== null && r.threshold !== undefined) parts.push(`max ${r.threshold}`);
+    else if (r.average !== null && r.average !== undefined) parts.push(`period average ${r.average}`);
+  }
   return (
     <span className="anomaly-figures">
-      <span className={`basis-tag ${r.basis}`}>{r.basis === "fixed" ? "daily limit" : r.basisLabel}</span>
+      <span className={`basis-tag ${r.basis}`}>
+        {r.basis === "fixed" ? (r.type === "threshold" ? "daily cap" : "per day") : r.basisLabel}
+      </span>
       {parts.join(" · ")}
     </span>
   );
@@ -232,8 +238,9 @@ export default function DayDetailsModal({ day, onClose, onEdit }) {
             </ul>
             <p className="field-hint">
               Each product is measured on its own basis: per housekeeping room (or serviced room), per laundry room, per
-              water-service room, or its daily total for fixed items. It is flagged above its normal maximum when one is
-              set, otherwise above 1.5× its average on this period&apos;s regular days (and more than 2 units). Use on a
+              water apartment, or its daily total for fixed items. When a max is set, the day&apos;s rate (fixed: the day&apos;s
+              total) is flagged above it; otherwise above 1.5× its average on this period&apos;s regular days (and more than
+              2 units). Use on a
               Sunday, a holiday or a day with 0 of that service is flagged too. Products set to “None” are never flagged.
               Check the movements below for a wrong date, a wrong quantity or a double entry.
             </p>

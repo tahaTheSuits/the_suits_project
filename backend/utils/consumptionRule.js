@@ -6,8 +6,12 @@
 //     water         per water-service apartment
 //     fixed         daily total (no service count)
 //     none          never evaluated
-//   normalMaxThreshold optional positive number: the normal maximum per
-//                      room of the basis (or per day for "fixed")
+//   normalMaxThreshold optional positive cap
+//     fixed                         max total units in one day; a day is
+//                                   flagged when its quantity > cap
+//     housekeeping/laundry/water    max units per room/service; the day's
+//                                   rate = quantity ÷ that day's service
+//                                   count, flagged when rate > cap
 //
 // Products saved before these fields existed have no basis: it is inferred
 // from the name (water / bottle -> water; tide, clora, detergent, bleach,
@@ -21,7 +25,7 @@ const MAX_THRESHOLD = 1000000;
 const BASIS_LABELS = {
   housekeeping: { rate: "per housekeeping room", count: "housekeeping rooms", short: "Housekeeping" },
   laundry: { rate: "per laundry room", count: "laundry services", short: "Laundry" },
-  water: { rate: "per water-service room", count: "water-service apartments", short: "Water" },
+  water: { rate: "per water apartment", count: "water apartments", short: "Water" },
   fixed: { rate: "per day", count: null, short: "Fixed daily" },
   none: { rate: null, count: null, short: "No alerts" },
 };

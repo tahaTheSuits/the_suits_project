@@ -14,13 +14,41 @@ export const api = axios.create({
 export const UNITS = ["pcs", "gallon", "bag"];
 
 // Consumption alert basis per product (mirrors backend utils/consumptionRule.js).
+// limitLabel / limitHelp describe what normalMaxThreshold means for the basis.
 export const CONSUMPTION_BASES = [
-  { value: "housekeeping", label: "Housekeeping", rate: "per housekeeping room" },
-  { value: "laundry", label: "Laundry", rate: "per laundry room" },
-  { value: "water", label: "Water", rate: "per water-service room" },
-  { value: "fixed", label: "Fixed daily", rate: "per day (daily limit)" },
-  { value: "none", label: "None (no alerts)", rate: null },
+  {
+    value: "housekeeping",
+    label: "Housekeeping",
+    rate: "per housekeeping room",
+    limitLabel: "Max per housekeeping room",
+    limitHelp:
+      "Rate = daily quantity ÷ that day's housekeeping rooms (serviced rooms if not recorded). Alert when the rate is above this max, e.g. 0.9.",
+  },
+  {
+    value: "laundry",
+    label: "Laundry",
+    rate: "per laundry room",
+    limitLabel: "Max per laundry room",
+    limitHelp: "Rate = daily quantity ÷ that day's laundry services. Alert when the rate is above this max.",
+  },
+  {
+    value: "water",
+    label: "Water",
+    rate: "per water apartment",
+    limitLabel: "Max per water apartment",
+    limitHelp: "Rate = daily quantity ÷ that day's water apartments. Alert when the rate is above this max.",
+  },
+  {
+    value: "fixed",
+    label: "Fixed daily",
+    rate: "per day",
+    limitLabel: "Max per day (total units)",
+    limitHelp: "Total daily cap: alert when more than this many units are taken out in one day, e.g. 10.",
+  },
+  { value: "none", label: "None (no alerts)", rate: null, limitLabel: null, limitHelp: null },
 ];
+export const NO_LIMIT_HELP =
+  "Leave empty to compare with 1.5× the product's period average instead (only days with more than 2 units).";
 export const basisInfo = (value) => CONSUMPTION_BASES.find((b) => b.value === value) || CONSUMPTION_BASES[0];
 export const inferConsumptionBasis = (name = "") =>
   /water|bottle/i.test(name) ? "water" : /tide|clora|detergent|bleach|laundry/i.test(name) ? "laundry" : "housekeeping";

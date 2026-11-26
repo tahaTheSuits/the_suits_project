@@ -6,6 +6,7 @@ import {
   api,
   UNITS,
   CONSUMPTION_BASES,
+  NO_LIMIT_HELP,
   basisInfo,
   getErrorMessage,
   inferConsumptionBasis,
@@ -376,17 +377,25 @@ function App() {
               ))}
             </select>
 
-            {(newProductBasis || inferConsumptionBasis(newProductName)) !== "none" && (
-              <input
-                className="input"
-                type="number"
-                min="0"
-                step="any"
-                placeholder={`Normal max ${basisInfo(newProductBasis || inferConsumptionBasis(newProductName)).rate} (optional)`}
-                value={newProductThreshold}
-                onChange={(e) => setNewProductThreshold(e.target.value)}
-              />
-            )}
+            {(() => {
+              const basis = basisInfo(newProductBasis || inferConsumptionBasis(newProductName));
+              if (basis.value === "none") return null;
+              return (
+                <label className="limit-field">
+                  <span>{basis.limitLabel} (optional)</span>
+                  <input
+                    className="input"
+                    type="number"
+                    min="0"
+                    step="any"
+                    placeholder={basis.value === "fixed" ? "e.g. 10" : "e.g. 0.9"}
+                    value={newProductThreshold}
+                    onChange={(e) => setNewProductThreshold(e.target.value)}
+                  />
+                  <small>{basis.limitHelp} {NO_LIMIT_HELP}</small>
+                </label>
+              );
+            })()}
           </div>
           <div className="card-actions">
             <button

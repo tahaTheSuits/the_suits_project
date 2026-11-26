@@ -2,7 +2,7 @@
 // in-place editing of entries (audited, reason required), minStock editing,
 // and the product's audit trail.
 import { useCallback, useEffect, useState } from "react";
-import { api, basisInfo, CONSUMPTION_BASES, getErrorMessage, inferConsumptionBasis } from "../api.js";
+import { api, basisInfo, CONSUMPTION_BASES, getErrorMessage, inferConsumptionBasis, NO_LIMIT_HELP } from "../api.js";
 import MovementEditModal from "./MovementEditModal.jsx";
 
 const formatDate = (date) => new Date(date).toLocaleDateString("en-GB");
@@ -267,16 +267,18 @@ export default function ProductHistory({ productId, products = [], onClose, onCh
                   ))}
                 </select>
                 {(ruleBasis || inferConsumptionBasis(product.product)) !== "none" && (
-                  <input
-                    className="input"
-                    type="number"
-                    min="0"
-                    step="any"
-                    placeholder={`Normal max ${basisInfo(ruleBasis || inferConsumptionBasis(product.product)).rate} (optional)`}
-                    value={ruleThreshold}
-                    onChange={(e) => setRuleThreshold(e.target.value)}
-                    aria-label="Normal maximum"
-                  />
+                  <label className="limit-field inline">
+                    <span>{basisInfo(ruleBasis || inferConsumptionBasis(product.product)).limitLabel}</span>
+                    <input
+                      className="input"
+                      type="number"
+                      min="0"
+                      step="any"
+                      placeholder="optional"
+                      value={ruleThreshold}
+                      onChange={(e) => setRuleThreshold(e.target.value)}
+                    />
+                  </label>
                 )}
                 <input
                   className="input"
@@ -288,13 +290,20 @@ export default function ProductHistory({ productId, products = [], onClose, onCh
                   Save
                 </button>
               </div>
+              {(ruleBasis || inferConsumptionBasis(product.product)) !== "none" && (
+                <p className="field-hint limit-help">
+                  {basisInfo(ruleBasis || inferConsumptionBasis(product.product)).limitHelp} {NO_LIMIT_HELP}
+                </p>
+              )}
               <p className="field-hint">
                 Currently: {basisInfo(product.consumptionBasis).label}
                 {product.consumptionBasisInferred ? " (auto from the name)" : ""}
                 {product.consumptionBasis === "none"
                   ? " — never flagged."
                   : product.normalMaxThreshold
-                    ? ` — flagged above ${product.normalMaxThreshold} ${product.unit} ${basisInfo(product.consumptionBasis).rate}.`
+                    ? product.consumptionBasis === "fixed"
+                      ? ` — flagged when more than ${product.normalMaxThreshold} ${product.unit} are taken out in one day.`
+                      : ` — flagged when the daily rate is above ${product.normalMaxThreshold} ${product.unit} ${basisInfo(product.consumptionBasis).rate}.`
                     : ` — flagged above 1.5× its period average ${basisInfo(product.consumptionBasis).rate} (days with more than 2 ${product.unit}).`}{" "}
                 Any use on Sundays, holidays or with 0 of that service is also flagged.
               </p>

@@ -107,6 +107,16 @@ const SERVICE_COUNT = {
   water: (r) => (known(r.waterCount) ? r.waterCount : null),
 };
 
+// Two numbers side by side with enough decimals to tell them apart:
+// (1.1, 0.9) -> ["1.10", "0.90"], (0.9004, 0.9) -> ["0.9004", "0.9000"].
+function formatPair(a, b) {
+  for (let digits = 2; digits <= 4; digits += 1) {
+    const pair = [a.toFixed(digits), b.toFixed(digits)];
+    if (pair[0] !== pair[1] || digits === 4) return pair;
+  }
+  return [String(a), String(b)];
+}
+
 const isNonServiceDay = (record, basis) =>
   record.isSunday === true || record.isHoliday === true || (basis === "housekeeping" && record.noScheduledCleaning === true);
 
@@ -355,23 +365,30 @@ function detectAnomalies(day, record, perProduct) {
     }
 
     if (rule.basis === "fixed") {
+      // Fixed: the cap is the maximum total units in one day.
       if (rule.normalMaxThreshold !== null) {
         if (quantity > rule.normalMaxThreshold) {
+          const comparison = `${quantity} vs max ${rule.normalMaxThreshold} ${unit} per day`;
           reasons.push({
             ...base,
             type: "threshold",
             rate: quantity,
             ratio: round(quantity / rule.normalMaxThreshold, 2),
-            message: `${product}: ${quantity} ${unit} today is above its daily limit of ${rule.normalMaxThreshold} ${unit}.`,
+            comparison,
+            message: `${product}: ${quantity} ${unit} taken out today, above the daily cap (${comparison}).`,
           });
         }
       } else if (rule.average && quantity > MIN_SPIKE_QUANTITY && quantity > rule.average * ANOMALY_FACTOR) {
+        const ratio = round(quantity / rule.average, 2);
+        const [q, avg] = formatPair(quantity, rule.average);
+        const comparison = `${q} vs average ${avg} ${unit} per day (${ratio}×)`;
         reasons.push({
           ...base,
           type: "spike",
           rate: quantity,
-          ratio: round(quantity / rule.average, 2),
-          message: `${product}: ${quantity} ${unit} today is ${round(quantity / rule.average, 2)}× its period daily average of ${rule.average} ${unit}.`,
+          ratio,
+          comparison,
+          message: `${product}: ${quantity} ${unit} today is ${ratio}× its period daily average (${comparison}).`,
         });
       }
       return;
@@ -389,22 +406,30 @@ function detectAnomalies(day, record, perProduct) {
       });
       return;
     }
-    const rate = round(quantity / count, 4);
-    const detail = `${rate} ${unit} ${labels.rate} (${quantity} ${unit} ÷ ${count} ${labels.count})`;
+    // Per room / service: rate = day's quantity ÷ day's service count,
+    // compared unrounded so rounding can never hide a breach.
+    const exactRate = quantity / count;
+    const rate = round(exactRate, 4);
+    const division = `${quantity} ${unit} ÷ ${count} ${labels.count}`;
     if (rule.normalMaxThreshold !== null) {
-      if (rate > rule.normalMaxThreshold) {
+      if (exactRate > rule.normalMaxThreshold) {
+        const [r, cap] = formatPair(exactRate, rule.normalMaxThreshold);
+        const comparison = `${r} vs max ${cap} ${labels.rate}`;
         reasons.push({
           ...base,
           type: "threshold",
           count,
           countLabel: labels.count,
           rate,
-          ratio: round(rate / rule.normalMaxThreshold, 2),
-          message: `${product}: ${detail} is above its normal maximum of ${rule.normalMaxThreshold} ${unit} ${labels.rate}.`,
+          ratio: round(exactRate / rule.normalMaxThreshold, 2),
+          comparison,
+          message: `${product}: ${comparison} (${division}).`,
         });
       }
-    } else if (rule.average && quantity > MIN_SPIKE_QUANTITY && rate > rule.average * ANOMALY_FACTOR) {
-      const ratio = round(rate / rule.average, 2);
+    } else if (rule.average && quantity > MIN_SPIKE_QUANTITY && exactRate > rule.average * ANOMALY_FACTOR) {
+      const ratio = round(exactRate / rule.average, 2);
+      const [r, avg] = formatPair(exactRate, rule.average);
+      const comparison = `${r} vs average ${avg} ${labels.rate} (${ratio}×)`;
       reasons.push({
         ...base,
         type: "spike",
@@ -412,7 +437,8 @@ function detectAnomalies(day, record, perProduct) {
         countLabel: labels.count,
         rate,
         ratio,
-        message: `${product}: ${detail} is ${ratio}× the period average of ${rule.average} ${unit} ${labels.rate}.`,
+        comparison,
+        message: `${product}: ${comparison} (${division}).`,
       });
     }
   });

@@ -1234,3 +1234,31 @@ select:focus {
 .anomaly-figures .basis-tag {
   margin: 0 0.4rem 0 0;
 }
+
+
+/* ===== Consumption limit field ===== */
+.limit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.limit-field span {
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.limit-field small {
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.limit-field.inline {
+  min-width: 190px;
+}
+
+.limit-help {
+  margin-top: 0.3rem;
+}
