@@ -1,7 +1,7 @@
 .reports-container {
   margin-top: 1.75rem;
-  background: #111827;
-  border: 1px solid #293548;
+  background: #131c2e;
+  border: 1px solid #23304a;
   border-radius: 16px;
   box-shadow: var(--shadow);
   padding: 1rem;
@@ -60,8 +60,8 @@
 }
 
 .export-section {
-  background: #1e293b;
-  border: 1px solid #293548;
+  background: #1a2540;
+  border: 1px solid #23304a;
   border-radius: 12px;
   padding: 0.75rem;
   display: grid;
@@ -93,7 +93,7 @@
 
 .current-stock-actions button:hover,
 .export-section button:hover {
-  background: #1e293b;
+  background: #1a2540;
 }
 
 .reports-section-title {
@@ -103,9 +103,9 @@
 
 .table-wrapper {
   overflow-x: auto;
-  border: 1px solid #293548;
+  border: 1px solid #23304a;
   border-radius: 12px;
-  background: #111827;
+  background: #131c2e;
 }
 
 .reports-table {
@@ -117,19 +117,19 @@
 .reports-table th,
 .reports-table td {
   padding: 0.72rem 0.68rem;
-  border-bottom: 1px solid #293548;
+  border-bottom: 1px solid #23304a;
   text-align: left;
 }
 
 .reports-table th {
-  background: #1e293b;
+  background: #1a2540;
   color: #cbd5e1;
   font-size: 0.84rem;
   letter-spacing: 0.2px;
 }
 
 .reports-table tbody tr:hover {
-  background: #1e293b;
+  background: #1a2540;
 }
 
 .loading-state {
@@ -161,7 +161,7 @@
   }
 
   .reports-table tr {
-    border-bottom: 1px solid #293548;
+    border-bottom: 1px solid #23304a;
     padding: 0.62rem 0.65rem 0.4rem;
   }
 
@@ -202,7 +202,7 @@
   margin-left: 0.4rem;
   padding: 0.1rem 0.4rem;
   border-radius: 999px;
-  background: #1e293b;
+  background: #1a2540;
   color: #94a3b8;
   font-size: 0.7rem;
   font-weight: 600;
@@ -218,13 +218,13 @@
 }
 
 .table-wrapper {
-  background: #111827;
+  background: #131c2e;
   border-color: var(--border);
   border-radius: 10px;
 }
 
 .reports-table th {
-  background: #1e293b;
+  background: #1a2540;
   color: var(--text-muted);
   font-size: 0.75rem;
   text-transform: uppercase;
@@ -236,7 +236,7 @@
 }
 
 .reports-table tbody tr:hover {
-  background: #1e293b;
+  background: #1a2540;
 }
 
 .export-section {
@@ -261,7 +261,7 @@
 }
 
 .current-stock-actions .lock-pill.open {
-  background: #111827;
+  background: #131c2e;
 }
 
 .reports-input {

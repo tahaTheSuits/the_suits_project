@@ -1,23 +1,23 @@
 /* ===================================================================
    The Suites Warehouse: clean operational theme
    DARK operational theme
-   Canvas #0B1120 · surfaces #111827 / #1E293B · borders #293548
-   Text #F8FAFC / #94A3B8 · primary #2563EB · stock in #10B981
+   Canvas #090d16 · surfaces #131c2e / #1a2540 · borders #23304a
+   Text #f1f5f9 / #94A3B8 · primary #2563EB · stock in #10B981
    Warning #F59E0B on amber tint · danger #EF4444 on red tint
    =================================================================== */
 :root {
   color-scheme: dark; /* native date pickers, selects and scrollbars in dark */
-  --bg-main: #0b1120;
-  --bg-surface: #111827;
-  --bg-card: #1e293b; /* inner panels inside cards */
-  --bg-subtle: #1e293b;
+  --bg-main: #090d16;
+  --bg-surface: #131c2e;
+  --bg-card: #1a2540; /* inner panels inside cards */
+  --bg-subtle: #1a2540;
   --input-bg: #0f172a;
-  --text-main: #f8fafc;
+  --text-main: #f1f5f9;
   --text-muted: #94a3b8;
   --text-faint: #64748b;
-  --text-on-dark: #f8fafc;
+  --text-on-dark: #f1f5f9;
   --text-muted-dark: #94a3b8;
-  --border: #293548;
+  --border: #23304a;
   --border-dark: #334155;
   --primary: #2563eb;
   --primary-hover: #3b82f6;
@@ -64,7 +64,7 @@ body {
   flex-wrap: wrap;
   gap: 0.6rem 1rem;
   padding: 0.6rem clamp(0.8rem, 3vw, 1.75rem);
-  background: rgba(11, 17, 32, 0.88);
+  background: rgba(9, 13, 22, 0.88);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--border);
 }
@@ -82,7 +82,7 @@ body {
   object-fit: contain;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: #111827;
+  background: #131c2e;
   padding: 3px;
 }
 
@@ -309,7 +309,7 @@ select {
   padding: 0.5rem 0.7rem;
   font-size: 0.9rem;
   font-family: inherit;
-  background: #111827;
+  background: #131c2e;
   color: var(--text-main);
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -365,7 +365,7 @@ select:focus {
 }
 
 .btn-secondary {
-  background: #111827;
+  background: #131c2e;
   color: var(--text-main);
   border-color: var(--border-dark);
 }
@@ -413,7 +413,7 @@ select:focus {
   overflow-x: auto;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: #111827;
+  background: #131c2e;
 }
 
 .inventory-table {
@@ -425,7 +425,7 @@ select:focus {
 .inventory-table thead th {
   position: sticky;
   top: 0;
-  background: #1e293b;
+  background: #1a2540;
   color: var(--text-muted);
   text-align: left;
   font-size: 0.75rem;
@@ -447,7 +447,7 @@ select:focus {
 }
 
 .inventory-table tbody tr:hover {
-  background: #1e293b;
+  background: #1a2540;
 }
 
 .inventory-table td[data-label="quantity"] {
@@ -486,7 +486,7 @@ select:focus {
   font-size: 0.8rem;
   font-weight: 600;
   color: var(--low-text);
-  background: #111827;
+  background: #131c2e;
   cursor: pointer;
 }
 
@@ -586,7 +586,7 @@ select:focus {
   gap: 0.65rem;
   padding: 0.75rem 0.75rem 0.85rem;
   border-radius: 10px;
-  background: #111827;
+  background: #131c2e;
   border: 1px solid var(--border);
   border-left: 4px solid var(--primary);
   box-shadow: var(--shadow-lg);
@@ -839,7 +839,7 @@ select:focus {
 }
 
 .status-pill.archived {
-  background: #1e293b;
+  background: #1a2540;
   color: var(--text-muted);
 }
 
@@ -1656,7 +1656,7 @@ select:focus {
 }
 
 .basis-tag.none {
-  background: #1e293b;
+  background: #1a2540;
   color: #94a3b8;
 }
 
@@ -1817,7 +1817,7 @@ select:focus {
 }
 
 .pop-badge.same {
-  background: #1e293b;
+  background: #1a2540;
   color: #94a3b8;
 }
 
@@ -1902,7 +1902,7 @@ select:focus {
   border: 1px solid var(--border);
   border-radius: 14px;
   box-shadow: var(--shadow-lg);
-  background: #111827;
+  background: #131c2e;
 }
 
 .modal-backdrop {
@@ -1912,7 +1912,7 @@ select:focus {
 .history-btn {
   border: 1px solid var(--border-dark);
   border-radius: 8px;
-  background: #111827;
+  background: #131c2e;
   color: var(--text-main);
   font-family: inherit;
 }
@@ -1961,7 +1961,7 @@ select:focus {
 }
 
 .lock-pill.open {
-  background: #111827;
+  background: #131c2e;
   color: var(--text-muted);
   border-color: var(--border-dark);
 }
@@ -1984,7 +1984,7 @@ select:focus {
 }
 
 .archived-row td {
-  background: #1e293b;
+  background: #1a2540;
 }
 
 .modal-notice {
@@ -2038,7 +2038,7 @@ textarea:focus,
 
 select option {
   background: #0f172a;
-  color: #f8fafc;
+  color: #f1f5f9;
 }
 
 input[type="checkbox"] {
@@ -2047,12 +2047,12 @@ input[type="checkbox"] {
 
 /* Surfaces */
 .topbar {
-  background: rgba(11, 17, 32, 0.88);
-  border-bottom-color: #293548;
+  background: rgba(9, 13, 22, 0.88);
+  border-bottom-color: #23304a;
 }
 
 .topbar-logo {
-  background: #f8fafc; /* the logo artwork is dark: keep it legible */
+  background: #f1f5f9; /* the logo artwork is dark: keep it legible */
   border-color: #334155;
 }
 
@@ -2061,7 +2061,7 @@ input[type="checkbox"] {
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.18em;
-  color: #f8fafc;
+  color: #f1f5f9;
 }
 
 .topbar-brand-name span {
@@ -2077,8 +2077,8 @@ input[type="checkbox"] {
 .modal,
 .table-wrapper,
 .inventory-table-wrapper {
-  background: #111827;
-  border-color: #293548;
+  background: #131c2e;
+  border-color: #23304a;
 }
 
 .action-panel,
@@ -2090,16 +2090,16 @@ input[type="checkbox"] {
 .pop-card,
 .sync-result,
 .modal-notice {
-  background: #1e293b;
-  border-color: #293548;
+  background: #1a2540;
+  border-color: #23304a;
   color: var(--text-main);
 }
 
 .inventory-table thead th,
 .reports-table th {
-  background: #1e293b;
+  background: #1a2540;
   color: #94a3b8;
-  border-bottom-color: #293548;
+  border-bottom-color: #23304a;
 }
 
 .inventory-table th,
@@ -2129,12 +2129,12 @@ input[type="checkbox"] {
 }
 
 .modal-close:hover {
-  color: #f8fafc;
+  color: #f1f5f9;
 }
 
 /* KPI cards: high contrast numbers, semantic accent bars. */
 .stat-value {
-  color: #f8fafc;
+  color: #f1f5f9;
 }
 
 .stat-total {
@@ -2165,8 +2165,8 @@ input[type="checkbox"] {
 
 .btn-secondary,
 .history-btn {
-  background: #1e293b;
-  color: #f8fafc;
+  background: #1a2540;
+  color: #f1f5f9;
   border-color: #334155;
 }
 
@@ -2263,8 +2263,8 @@ input[type="checkbox"] {
 }
 
 .tab:hover {
-  background: #1e293b;
-  color: #f8fafc;
+  background: #1a2540;
+  color: #f1f5f9;
 }
 
 .tab.active {
@@ -2317,7 +2317,7 @@ input[type="checkbox"] {
 }
 
 .lock-pill.open {
-  background: #1e293b;
+  background: #1a2540;
   color: #94a3b8;
   border-color: #334155;
 }
@@ -2328,7 +2328,7 @@ input[type="checkbox"] {
 }
 
 .current-stock-actions .lock-pill.open {
-  background: #1e293b;
+  background: #1a2540;
   color: #94a3b8;
 }
 
@@ -2399,8 +2399,8 @@ input[type="checkbox"] {
 }
 
 .toast {
-  background: #111827;
-  border: 1px solid #293548;
+  background: #131c2e;
+  border: 1px solid #23304a;
   border-left-width: 4px;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
 }
@@ -2418,7 +2418,7 @@ input[type="checkbox"] {
 }
 
 .toast-head strong {
-  color: #f8fafc;
+  color: #f1f5f9;
 }
 
 .toast-body p {
@@ -2513,8 +2513,8 @@ body {
   z-index: 45;
   width: min(300px, calc(100vw - 1.5rem));
   padding: 0.4rem;
-  background: #111827;
-  border: 1px solid #293548;
+  background: #131c2e;
+  border: 1px solid #23304a;
   border-radius: 10px;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
 }
@@ -2537,7 +2537,7 @@ body {
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: #f8fafc;
+  color: #f1f5f9;
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -2545,7 +2545,7 @@ body {
 
 .settings-item:hover,
 .settings-item:focus-visible {
-  background: #1e293b;
+  background: #1a2540;
   outline: none;
 }
 
@@ -2572,5 +2572,270 @@ body {
 
   .settings-menu .settings-trigger {
     width: 100%;
+  }
+}
+
+
+/* ===== Add product form: balanced grid + full-width alerts block ===== */
+.product-form-grid {
+  display: grid;
+  gap: 0.75rem 0.9rem;
+  grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)) minmax(0, 1.4fr);
+  align-items: end;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.form-field > span {
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #94a3b8;
+}
+
+.form-field .input,
+.form-field select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.product-alert-block {
+  grid-column: 1 / -1;
+  margin: 0.35rem 0 0;
+  padding: 0.85rem 1rem 0.95rem;
+  border: 1px solid #23304a;
+  border-radius: 10px;
+  background: #0f172a;
+  min-width: 0;
+}
+
+.product-alert-block legend {
+  padding: 0 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.product-alert-fields {
+  display: grid;
+  gap: 0.75rem 0.9rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  max-width: 720px;
+}
+
+.product-alert-help {
+  margin: 0.6rem 0 0;
+  max-width: 72ch;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  color: #94a3b8;
+}
+
+@media (max-width: 1024px) {
+  .product-form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .product-form-grid .field-name {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 560px) {
+  .product-form-grid,
+  .product-alert-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+
+/* ===== Reset warehouse: centered modal (portaled to <body>) ===== */
+.reset-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem 1rem;
+  background: rgba(2, 6, 14, 0.78);
+  backdrop-filter: blur(3px);
+  overflow-y: auto;
+}
+
+.reset-dialog {
+  position: relative;
+  width: min(560px, 100%);
+  max-height: calc(100vh - 3rem);
+  overflow-y: auto;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  padding: 1.35rem 1.5rem 1.4rem;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 14px;
+  background: #131c2e;
+  color: #f1f5f9;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  text-align: left;
+  white-space: normal;
+}
+
+.reset-dialog-head {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 0.75rem;
+}
+
+.reset-dialog-icon {
+  display: grid;
+  place-items: center;
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
+  font-size: 1.1rem;
+}
+
+.reset-dialog h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  line-height: 1.3;
+  color: #f1f5f9;
+}
+
+.reset-dialog-sub {
+  margin: 0.15rem 0 0;
+  font-size: 0.82rem;
+  color: #94a3b8;
+}
+
+.reset-dialog-warning {
+  padding: 0.8rem 0.95rem;
+  border-radius: 10px;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  background: rgba(239, 68, 68, 0.12);
+  color: #fecaca;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.reset-dialog-warning strong {
+  color: #fca5a5;
+}
+
+.reset-dialog-counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reset-dialog-counts li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #23304a;
+  border-radius: 8px;
+  background: #0f172a;
+}
+
+.reset-dialog-counts strong {
+  font-size: 1.05rem;
+  color: #f1f5f9;
+  font-variant-numeric: tabular-nums;
+}
+
+.reset-dialog-counts span {
+  font-size: 0.76rem;
+  color: #94a3b8;
+}
+
+.reset-dialog-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.84rem;
+  color: #cbd5e1;
+}
+
+.reset-dialog-field code {
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  background: rgba(239, 68, 68, 0.16);
+  color: #fca5a5;
+  font-weight: 700;
+}
+
+.reset-dialog-field em {
+  color: #94a3b8;
+  font-style: normal;
+}
+
+.reset-dialog-field .input {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.reset-confirm-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.65rem 0.8rem;
+  border: 1.5px solid #475569;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #ffffff;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.reset-confirm-input::placeholder {
+  color: #475569;
+}
+
+.reset-confirm-input:focus {
+  outline: none;
+  border-color: #f87171;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.3);
+}
+
+.reset-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 0.2rem;
+  padding-top: 0.9rem;
+  border-top: 1px solid #23304a;
+}
+
+.reset-dialog-actions .btn {
+  min-width: 120px;
+}
+
+@media (max-width: 480px) {
+  .reset-dialog {
+    padding: 1.1rem 1rem 1.2rem;
+  }
+
+  .reset-dialog-actions .btn {
+    flex: 1 1 0;
   }
 }

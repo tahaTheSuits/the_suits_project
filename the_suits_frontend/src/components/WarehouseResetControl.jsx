@@ -2,6 +2,7 @@
 // "full_warehouse"). Shows what would be deleted, requires typing RESET (or
 // WIPE ALL), and hands the result to App so every view is cleared at once.
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { api, getErrorMessage } from "../api.js";
 
 const PHRASES = ["RESET", "WIPE ALL"];
@@ -57,39 +58,55 @@ export default function ResetDialog({ onClose, onReset }) {
   };
 
   const c = preview?.counts;
-  return (
+  // Rendered into <body>: the top bar uses backdrop-filter, which would
+  // otherwise trap this fixed overlay inside the bar and clip it.
+  return createPortal(
     <div
-      className="modal-backdrop nested"
-      onClick={(e) => {
-        e.stopPropagation();
+      className="reset-overlay"
+      onClick={() => {
         if (!busyRef.current) onClose();
       }}
     >
-      <div className="modal reset-modal" role="alertdialog" aria-modal="true" aria-labelledby="reset-title" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2 id="reset-title">⚠ Reset All Warehouse Data (Delete Products &amp; History)</h2>
-          <button className="modal-close" onClick={onClose} disabled={busy} aria-label="Close">
+      <div
+        className="reset-dialog"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="reset-title"
+        aria-describedby="reset-desc"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="reset-dialog-head">
+          <span className="reset-dialog-icon" aria-hidden="true">
+            ⚠
+          </span>
+          <div>
+            <h2 id="reset-title">Reset all warehouse data</h2>
+            <p className="reset-dialog-sub">Deletes every product and all history</p>
+          </div>
+          <button type="button" className="modal-close" onClick={onClose} disabled={busy} aria-label="Close">
             ×
           </button>
         </div>
 
-        <div className="reset-warning" role="alert">
-          <strong>This cannot be undone.</strong> ALL products, ALL stock in / stock out movements, ALL corrections,
-          edits and adjustments, ALL occupancy and consumption data, and every report built from them will be
-          permanently deleted. The period lock is cleared. The warehouse will start with zero products.
+        <div id="reset-desc" className="reset-dialog-warning" role="alert">
+          <strong>This cannot be undone.</strong> All products, stock in / stock out movements, corrections, edits,
+          adjustments, occupancy and consumption data, and every report built from them will be permanently deleted.
+          The period lock is cleared and the warehouse starts with zero products.
         </div>
 
         {error && <p className="section-error">{error}</p>}
         {!preview && !error && <p className="loading-state">Counting what would be deleted...</p>}
         {preview && (
           <>
-            <ul className="reset-counts">
-              <li><strong>{c.products}</strong> products</li>
-              <li><strong>{c.stockIns}</strong> stock in movements</li>
-              <li><strong>{c.stockOuts}</strong> stock out movements</li>
-              <li><strong>{c.adjustments}</strong> corrections, edits and adjustments</li>
-              <li><strong>{c.occupancyDays}</strong> occupancy / consumption days</li>
-              {preview.periodLock && <li>period lock through <strong>{preview.periodLock}</strong></li>}
+            <ul className="reset-dialog-counts">
+              <li><strong>{c.products}</strong><span>products</span></li>
+              <li><strong>{c.stockIns}</strong><span>stock in movements</span></li>
+              <li><strong>{c.stockOuts}</strong><span>stock out movements</span></li>
+              <li><strong>{c.adjustments}</strong><span>corrections &amp; adjustments</span></li>
+              <li><strong>{c.occupancyDays}</strong><span>occupancy days</span></li>
+              {preview.periodLock && (
+                <li><strong>{preview.periodLock}</strong><span>period lock through</span></li>
+              )}
             </ul>
             {preview.enabled === false && (
               <p className="lock-warning">
@@ -100,44 +117,44 @@ export default function ResetDialog({ onClose, onReset }) {
           </>
         )}
 
-        <div className="occupancy-grid reset-grid">
-          <label className="occupancy-note">
-            <span>
-              Type <code>RESET</code> (or <code>WIPE ALL</code>) to confirm
-            </span>
-            <input
-              ref={inputRef}
-              className="input"
-              value={typed}
-              onChange={(e) => setTyped(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && wipe()}
-              autoComplete="off"
-              spellCheck={false}
-              disabled={busy}
-              aria-label="Confirmation phrase"
-            />
-          </label>
-          <label className="occupancy-note">
-            Reason (optional, saved in the audit trail)
-            <input
-              className="input"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              disabled={busy}
-              maxLength={500}
-            />
-          </label>
-        </div>
+        <label className="reset-dialog-field">
+          <span>
+            Type <code>RESET</code> to confirm <em>(or WIPE ALL)</em>
+          </span>
+          <input
+            ref={inputRef}
+            className="reset-confirm-input"
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && wipe()}
+            placeholder="RESET"
+            autoComplete="off"
+            spellCheck={false}
+            disabled={busy}
+            aria-label="Confirmation phrase"
+          />
+        </label>
+        <label className="reset-dialog-field">
+          <span>Reason (optional, saved in the audit trail)</span>
+          <input
+            className="input"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            disabled={busy}
+            maxLength={500}
+          />
+        </label>
 
-        <div className="card-actions">
-          <button className="btn btn-danger" onClick={wipe} disabled={disabled}>
-            {busy ? "Deleting everything..." : "Permanently delete all warehouse data"}
-          </button>
-          <button className="link-btn" onClick={onClose} disabled={busy}>
+        <div className="reset-dialog-actions">
+          <button type="button" className="btn btn-secondary" onClick={onClose} disabled={busy}>
             Cancel
+          </button>
+          <button type="button" className="btn btn-danger" onClick={wipe} disabled={disabled}>
+            {busy ? "Deleting everything..." : "Confirm Reset"}
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

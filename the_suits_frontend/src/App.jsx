@@ -465,87 +465,117 @@ function App() {
               </div>
               {activePanel === "add" && (
         <div className="card">
-          <div className="from-row">
-            <input
-              className="input"
-              placeholder="Product Name"
-              value={newProductName}
-              onChange={(e) => setNewProductName(e.target.value)}
-            />
+          {/* Main product fields: one balanced, labelled grid. */}
+          <div className="product-form-grid">
+            <label className="form-field field-name">
+              <span>Product name</span>
+              <input
+                className="input"
+                placeholder="Product Name"
+                value={newProductName}
+                onChange={(e) => setNewProductName(e.target.value)}
+              />
+            </label>
 
-            <input
-              className="input"
-              type="number"
-              min="0"
-              placeholder="Initial Qty"
-              value={newProductQty}
-              onChange={(e) => setNewProductQty(e.target.value)}
-            />
+            <label className="form-field">
+              <span>Initial qty</span>
+              <input
+                className="input"
+                type="number"
+                min="0"
+                placeholder="Initial Qty"
+                value={newProductQty}
+                onChange={(e) => setNewProductQty(e.target.value)}
+              />
+            </label>
 
-            <select
-              value={newProductUnit}
-              onChange={(e) => setNewProductUnit(e.target.value)}
-              aria-label="Unit"
-            >
-              {UNITS.map((unit) => (
-                <option key={unit} value={unit}>{unit}</option>
-              ))}
-            </select>
+            <label className="form-field">
+              <span>Unit</span>
+              <select
+                value={newProductUnit}
+                onChange={(e) => setNewProductUnit(e.target.value)}
+                aria-label="Unit"
+              >
+                {UNITS.map((unit) => (
+                  <option key={unit} value={unit}>{unit}</option>
+                ))}
+              </select>
+            </label>
 
-            <input
-              className="input"
-              type="number"
-              min="0"
-              placeholder="Min Stock (default 5)"
-              value={newProductMinStock}
-              onChange={(e) => setNewProductMinStock(e.target.value)}
-            />
+            <label className="form-field">
+              <span>Min stock</span>
+              <input
+                className="input"
+                type="number"
+                min="0"
+                placeholder="Min Stock (default 5)"
+                value={newProductMinStock}
+                onChange={(e) => setNewProductMinStock(e.target.value)}
+              />
+            </label>
 
-            <input
-              className="input"
-              placeholder="Barcode (optional)"
-              value={newProductBarcode}
-              onChange={(e) => setNewProductBarcode(e.target.value)}
-              autoComplete="off"
-              spellCheck={false}
-            />
-
-            <select
-              value={newProductBasis}
-              onChange={(e) => setNewProductBasis(e.target.value)}
-              aria-label="Consumption alert basis"
-              title="What this product's daily use is compared with for consumption alerts"
-            >
-              <option value="">
-                Alerts: auto ({basisInfo(inferConsumptionBasis(newProductName)).label})
-              </option>
-              {CONSUMPTION_BASES.map((b) => (
-                <option key={b.value} value={b.value}>
-                  Alerts: {b.label}
-                </option>
-              ))}
-            </select>
-
-            {(() => {
-              const basis = basisInfo(newProductBasis || inferConsumptionBasis(newProductName));
-              if (basis.value === "none") return null;
-              return (
-                <label className="limit-field">
-                  <span>{basis.limitLabel} (optional)</span>
-                  <input
-                    className="input"
-                    type="number"
-                    min="0"
-                    step="any"
-                    placeholder={basis.value === "fixed" ? "e.g. 10" : "e.g. 0.9"}
-                    value={newProductThreshold}
-                    onChange={(e) => setNewProductThreshold(e.target.value)}
-                  />
-                  <small>{basis.limitHelp} {NO_LIMIT_HELP}</small>
-                </label>
-              );
-            })()}
+            <label className="form-field">
+              <span>Barcode</span>
+              <input
+                className="input"
+                placeholder="Barcode (optional)"
+                value={newProductBarcode}
+                onChange={(e) => setNewProductBarcode(e.target.value)}
+                autoComplete="off"
+                spellCheck={false}
+              />
+            </label>
           </div>
+
+          {/* Consumption alerts: own full-width block so the long help text
+              never squeezes the fields above. */}
+          {(() => {
+            const basis = basisInfo(newProductBasis || inferConsumptionBasis(newProductName));
+            return (
+              <fieldset className="product-alert-block">
+                <legend>Consumption alerts</legend>
+                <div className="product-alert-fields">
+                  <label className="form-field">
+                    <span>Alert basis</span>
+                    <select
+                      value={newProductBasis}
+                      onChange={(e) => setNewProductBasis(e.target.value)}
+                      aria-label="Consumption alert basis"
+                      title="What this product's daily use is compared with for consumption alerts"
+                    >
+                      <option value="">
+                        Alerts: auto ({basisInfo(inferConsumptionBasis(newProductName)).label})
+                      </option>
+                      {CONSUMPTION_BASES.map((b) => (
+                        <option key={b.value} value={b.value}>
+                          Alerts: {b.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {basis.value !== "none" && (
+                    <label className="form-field">
+                      <span>{basis.limitLabel} (optional)</span>
+                      <input
+                        className="input"
+                        type="number"
+                        min="0"
+                        step="any"
+                        placeholder={basis.value === "fixed" ? "e.g. 10" : "e.g. 0.9"}
+                        value={newProductThreshold}
+                        onChange={(e) => setNewProductThreshold(e.target.value)}
+                      />
+                    </label>
+                  )}
+                </div>
+                {basis.value !== "none" && (
+                  <p className="product-alert-help">
+                    {basis.limitHelp} {NO_LIMIT_HELP}
+                  </p>
+                )}
+              </fieldset>
+            );
+          })()}
           {todayLocked && Number(newProductQty) > 0 && (
             <p className="lock-warning">🔒 {lockMessage(periodLock.lockedThroughDate)} An initial quantity would be a stock in dated today: leave it at 0.</p>
           )}
