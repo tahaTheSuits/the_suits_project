@@ -20,7 +20,7 @@ import StockOutCard from "./components/StockOutCard.jsx";
 import PeriodLockControl from "./components/PeriodLockControl.jsx";
 import SettingsMenu from "./components/SettingsMenu.jsx";
 import { useToast } from "./toast.js";
-import logo from "./assets/logo2.png";
+import BrandMark from "./components/BrandMark.jsx";
 import "./App.css";
 
 // Every endpoint is requested exactly once per load (the dashboard stats are
@@ -373,7 +373,7 @@ function App() {
     <div className="app-shell">
       <header className="topbar">
         <div className="topbar-brand">
-          <img className="topbar-logo" src={logo} alt="The Suites" />
+          <BrandMark className="topbar-logo" size={40} />
           <div>
             <p className="topbar-brand-name">
               THE SUITES <span>· Warehouse</span>
