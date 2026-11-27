@@ -1,7 +1,7 @@
 .reports-container {
   margin-top: 1.75rem;
-  background: #ffffff;
-  border: 1px solid #e2e8f0;
+  background: #111c33;
+  border: 1px solid #233554;
   border-radius: 16px;
   box-shadow: var(--shadow);
   padding: 1rem;
@@ -18,8 +18,8 @@
   max-width: 560px;
   text-align: center;
   border: 1px solid rgba(239, 68, 68, 0.35);
-  background: rgba(239, 68, 68, 0.1);
-  color: #b91c1c;
+  background: rgba(239, 68, 68, 0.14);
+  color: #fca5a5;
   padding: 0.65rem 0.8rem;
   border-radius: 10px;
 }
@@ -36,11 +36,11 @@
   gap: 0.35rem;
   font-size: 0.88rem;
   font-weight: 600;
-  color: #334155;
+  color: #cbd5e1;
 }
 
 .reports-input {
-  border: 1px solid #cbd5e1;
+  border: 1px solid #2d436b;
   border-radius: 10px;
   padding: 0.55rem 0.65rem;
   font-size: 0.9rem;
@@ -49,7 +49,7 @@
 .reports-input:focus {
   outline: none;
   border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.35);
 }
 
 .export-container {
@@ -60,8 +60,8 @@
 }
 
 .export-section {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: #162442;
+  border: 1px solid #233554;
   border-radius: 12px;
   padding: 0.75rem;
   display: grid;
@@ -71,7 +71,7 @@
 .export-section span {
   font-size: 0.88rem;
   font-weight: 700;
-  color: #334155;
+  color: #cbd5e1;
 }
 
 .current-stock-actions button,
@@ -93,7 +93,7 @@
 
 .current-stock-actions button:hover,
 .export-section button:hover {
-  background: #f8fafc;
+  background: #162442;
 }
 
 .reports-section-title {
@@ -103,9 +103,9 @@
 
 .table-wrapper {
   overflow-x: auto;
-  border: 1px solid #e2e8f0;
+  border: 1px solid #233554;
   border-radius: 12px;
-  background: #ffffff;
+  background: #111c33;
 }
 
 .reports-table {
@@ -117,24 +117,24 @@
 .reports-table th,
 .reports-table td {
   padding: 0.72rem 0.68rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid #233554;
   text-align: left;
 }
 
 .reports-table th {
-  background: #f8fafc;
-  color: #334155;
+  background: #162442;
+  color: #cbd5e1;
   font-size: 0.84rem;
   letter-spacing: 0.2px;
 }
 
 .reports-table tbody tr:hover {
-  background: #f8fafc;
+  background: #162442;
 }
 
 .loading-state {
   text-align: center;
-  color: #475569;
+  color: #94a3b8;
   padding: 1rem;
 }
 
@@ -161,7 +161,7 @@
   }
 
   .reports-table tr {
-    border-bottom: 1px solid #e2e8f0;
+    border-bottom: 1px solid #233554;
     padding: 0.62rem 0.65rem 0.4rem;
   }
 
@@ -177,7 +177,7 @@
 
   .reports-table td::before {
     content: attr(data-label);
-    color: #475569;
+    color: #94a3b8;
     font-weight: 600;
     font-size: 0.8rem;
   }
@@ -185,11 +185,11 @@
 .export-period {
   margin: -0.2rem 0 0.8rem;
   font-size: 0.85rem;
-  color: #475569;
+  color: #94a3b8;
 }
 
 .export-period.invalid {
-  color: #b91c1c;
+  color: #fca5a5;
   font-weight: 600;
 }
 
@@ -202,8 +202,8 @@
   margin-left: 0.4rem;
   padding: 0.1rem 0.4rem;
   border-radius: 999px;
-  background: #f8fafc;
-  color: #475569;
+  background: #162442;
+  color: #94a3b8;
   font-size: 0.7rem;
   font-weight: 600;
 }
@@ -218,13 +218,13 @@
 }
 
 .table-wrapper {
-  background: #ffffff;
+  background: #111c33;
   border-color: var(--border);
   border-radius: 10px;
 }
 
 .reports-table th {
-  background: #f8fafc;
+  background: #162442;
   color: var(--text-muted);
   font-size: 0.75rem;
   text-transform: uppercase;
@@ -236,7 +236,7 @@
 }
 
 .reports-table tbody tr:hover {
-  background: #f8fafc;
+  background: #162442;
 }
 
 .export-section {
@@ -261,7 +261,7 @@
 }
 
 .current-stock-actions .lock-pill.open {
-  background: #ffffff;
+  background: #111c33;
 }
 
 .reports-input {
